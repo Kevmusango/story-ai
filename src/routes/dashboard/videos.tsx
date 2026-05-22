@@ -204,16 +204,29 @@ function MyVideos() {
   const { user } = useAuth();
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const fetchVideos = async () => {
-    if (!user) return;
+    if (!user) {
+      setVideos([]);
+      setLoading(false);
+      setLoadError("You are not signed in.");
+      return;
+    }
     setLoading(true);
-    const { data } = await supabase
+    setLoadError("");
+    const { data, error } = await supabase
       .from("videos")
       .select("id,opening_line,script_text,status,mode,platform,duration_seconds,thumbnail_url,output_url,final_video_url,render_status,stock_urls,created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50);
+    if (error) {
+      setVideos([]);
+      setLoadError(error.message);
+      setLoading(false);
+      return;
+    }
     setVideos((data as VideoRow[]) ?? []);
     setLoading(false);
   };
@@ -248,6 +261,13 @@ function MyVideos() {
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-6 h-6 text-white/20 animate-spin" />
+        </div>
+      ) : loadError ? (
+        <div className="flex flex-col items-center justify-center py-20 px-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
+          <AlertCircle className="w-7 h-7 text-red-400 mb-3" />
+          <p className="text-sm font-medium text-red-300 mb-1">Could not load videos</p>
+          <p className="text-xs text-red-300/70 max-w-md mb-4">{loadError}</p>
+          <p className="text-[11px] text-white/25 font-mono break-all max-w-md">User: {user?.id ?? "not signed in"}</p>
         </div>
       ) : videos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 px-4 bg-[#0e0e12] border border-white/[0.06] rounded-2xl text-center">

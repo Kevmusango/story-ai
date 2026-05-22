@@ -60,17 +60,23 @@ function ResultPage() {
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!user) {
+      setError("You are not signed in.");
+      setLoading(false);
+      return;
+    }
     supabase
       .from("videos")
       .select("id,script_text,opening_line,archetype_used,tone_used,stock_urls,asset_urls,output_url,final_video_url,render_status,platform,duration_seconds")
       .eq("id", videoId)
+      .eq("user_id", user.id)
       .single()
       .then(({ data, error: err }) => {
-        if (err || !data) setError("Story not found.");
+        if (err || !data) setError(err?.message ?? "Story not found.");
         else setVideo(data as VideoRecord);
         setLoading(false);
       });
-  }, [videoId]);
+  }, [videoId, user]);
 
   // Detect exact voiceover duration so composition ends exactly when narration ends
   useEffect(() => {
