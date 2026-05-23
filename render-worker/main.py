@@ -230,7 +230,8 @@ def render_clip(src: Path, dest: Path, duration: float, index: int,
             "zoompan=z='1.06':d=1:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-on/120)'",
         ]
         vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},{variants[index % 4]}:s={width}x{height}:fps={FPS},setsar=1,format=yuv420p"
-        run(["ffmpeg", "-y", "-loop", "1", "-t", str(duration), "-i", str(src), "-vf", vf, "-an", "-pix_fmt", "yuv420p", str(dest)])
+        run(["ffmpeg", "-y", "-loop", "1", "-t", str(duration), "-i", str(src), "-vf", vf,
+             "-c:v", "libx264", "-preset", "ultrafast", "-an", "-pix_fmt", "yuv420p", str(dest)])
     else:
         vf = f"{face_crop_filter(src, width, height)},fps={FPS},setsar=1,format=yuv420p"
         if keep_audio:
@@ -239,7 +240,7 @@ def render_clip(src: Path, dest: Path, duration: float, index: int,
                  "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-pix_fmt", "yuv420p", str(dest)])
         else:
             run(["ffmpeg", "-y", "-stream_loop", "-1", "-t", str(duration), "-i", str(src),
-                 "-vf", vf, "-an", "-pix_fmt", "yuv420p", str(dest)])
+                 "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-an", "-pix_fmt", "yuv420p", str(dest)])
 
 
 def concat_clips_with_audio(clips: list[Path], out_path: Path) -> None:
