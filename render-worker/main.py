@@ -55,7 +55,9 @@ def run(cmd: list[str]) -> None:
         cmd = ["ffmpeg", "-threads", "1"] + cmd[1:]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if proc.returncode != 0:
-        raise RuntimeError(proc.stderr[-4000:] or "FFmpeg command failed")
+        err = proc.stderr[-4000:] or "FFmpeg command failed"
+        print(f"[ffmpeg-error] rc={proc.returncode} tail={proc.stderr[-300:]}")
+        raise RuntimeError(err)
 
 
 def safe_name(value: str) -> str:
@@ -227,17 +229,17 @@ def render_clip(src: Path, dest: Path, duration: float, index: int,
             "zoompan=z='1.06':d=1:x='(iw-iw/zoom)*on/120':y='ih/2-(ih/zoom/2)'",
             "zoompan=z='1.06':d=1:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-on/120)'",
         ]
-        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},{variants[index % 4]}:s={width}x{height}:fps={FPS},format=yuv420p"
-        run(["ffmpeg", "-y", "-loop", "1", "-t", str(duration), "-i", str(src), "-vf", vf, "-an", str(dest)])
+        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},{variants[index % 4]}:s={width}x{height}:fps={FPS},setsar=1,format=yuv420p"
+        run(["ffmpeg", "-y", "-loop", "1", "-t", str(duration), "-i", str(src), "-vf", vf, "-an", "-pix_fmt", "yuv420p", str(dest)])
     else:
-        vf = f"{face_crop_filter(src, width, height)},fps={FPS},format=yuv420p"
+        vf = f"{face_crop_filter(src, width, height)},fps={FPS},setsar=1,format=yuv420p"
         if keep_audio:
             # Preserve original audio — no duration cap, let clip run naturally
             run(["ffmpeg", "-y", "-i", str(src), "-vf", vf,
                  "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-pix_fmt", "yuv420p", str(dest)])
         else:
             run(["ffmpeg", "-y", "-stream_loop", "-1", "-t", str(duration), "-i", str(src),
-                 "-vf", vf, "-an", str(dest)])
+                 "-vf", vf, "-an", "-pix_fmt", "yuv420p", str(dest)])
 
 
 def concat_clips_with_audio(clips: list[Path], out_path: Path) -> None:
@@ -256,16 +258,10 @@ def concat_clips(clips: list[Path], durations: list[float], tone: str, script: s
         shutil.copyfile(clips[0], out_path)
         return
 
-    inputs: list[str] = []
-    for clip in clips:
-        inputs.extend(["-i", str(clip)])
-
-    n = len(clips)
-    sar_filters = "".join(f"[{i}:v]setsar=1[s{i}];" for i in range(n))
-    concat_inputs = "".join(f"[s{i}]" for i in range(n))
-    run(["ffmpeg", "-y", *inputs,
-         "-filter_complex", f"{sar_filters}{concat_inputs}concat=n={n}:v=1:a=0[v]",
-         "-map", "[v]", "-an", "-pix_fmt", "yuv420p", str(out_path)])
+    concat_file = out_path.with_name("concat_list.txt")
+    concat_file.write_text("\n".join(f"file '{c}'" for c in clips), encoding="utf-8")
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
+         "-c", "copy", str(out_path)])
 
 
 TONE_QUERIES: dict[str, str] = {
