@@ -273,43 +273,6 @@ def concat_clips(clips: list[Path], durations: list[float], tone: str, script: s
     run(["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(filters), "-map", current, "-an", "-pix_fmt", "yuv420p", str(out_path)])
 
 
-# CC0 royalty-free tracks from Pixabay CDN — no API key, no registration.
-# Pixabay serves the bandwidth. Add more URLs per tone for more variety.
-MUSIC_CATALOG: dict[str, list[str]] = {
-    "trustworthy": [
-        "https://cdn.pixabay.com/audio/2024/02/15/audio_2a9a73b2d7.mp3",
-        "https://cdn.pixabay.com/audio/2023/11/13/audio_677ad40018.mp3",
-        "https://cdn.pixabay.com/audio/2022/03/15/audio_8cb3c2d7c3.mp3",
-        "https://cdn.pixabay.com/audio/2024/01/08/audio_e887f6516d.mp3",
-    ],
-    "energetic": [
-        "https://cdn.pixabay.com/audio/2023/09/04/audio_6098a8f8ad.mp3",
-        "https://cdn.pixabay.com/audio/2024/03/11/audio_f04b1f5b3d.mp3",
-        "https://cdn.pixabay.com/audio/2022/10/12/audio_9b2c3f4d12.mp3",
-        "https://cdn.pixabay.com/audio/2023/06/21/audio_5a7d9e1c44.mp3",
-    ],
-    "funny": [
-        "https://cdn.pixabay.com/audio/2023/04/17/audio_3b8f2c1e90.mp3",
-        "https://cdn.pixabay.com/audio/2022/08/23/audio_7c4d1a5f68.mp3",
-    ],
-    "premium": [
-        "https://cdn.pixabay.com/audio/2024/02/28/audio_1d6b8c3a75.mp3",
-        "https://cdn.pixabay.com/audio/2023/10/05/audio_4e2f9b7c31.mp3",
-        "https://cdn.pixabay.com/audio/2022/12/01/audio_8a3c5d2e19.mp3",
-    ],
-    "calm": [
-        "https://cdn.pixabay.com/audio/2023/07/14/audio_2c5e8a1b66.mp3",
-        "https://cdn.pixabay.com/audio/2024/01/22/audio_9f4d3c7b52.mp3",
-        "https://cdn.pixabay.com/audio/2022/09/08/audio_6b1a4e2d83.mp3",
-    ],
-    "warm": [
-        "https://cdn.pixabay.com/audio/2023/05/30/audio_3d7c1f9a48.mp3",
-        "https://cdn.pixabay.com/audio/2024/03/02/audio_5e8b2d4c71.mp3",
-        "https://cdn.pixabay.com/audio/2022/11/17/audio_1f6a3e8d25.mp3",
-    ],
-}
-
-
 TONE_QUERIES: dict[str, str] = {
     "trustworthy": "corporate",
     "energetic":   "upbeat energetic",
@@ -320,43 +283,35 @@ TONE_QUERIES: dict[str, str] = {
 }
 
 
-def fetch_pixabay_music(tone: str) -> str:
-    api_key = os.environ.get("PIXABAY_API_KEY", "")
-    if not api_key:
-        return ""
-    query = TONE_QUERIES.get(tone or "trustworthy", "corporate")
-    try:
-        res = requests.get(
-            "https://pixabay.com/api/",
-            params={
-                "key": api_key,
-                "q": query,
-                "media_type": "music",
-                "per_page": 20,
-                "page": random.randint(1, 3),
-            },
-            timeout=10,
-        )
-        hits = res.json().get("hits", [])
-        if hits:
-            track = random.choice(hits)
-            url = track.get("audio", track.get("url", ""))
-            if url:
-                print(f"[music] Pixabay track: {url}")
-                return url
-    except Exception as exc:
-        print(f"[music] Pixabay fetch failed: {exc}")
-    return ""
-
-
 def pick_music(tone: str) -> str:
-    url = fetch_pixabay_music(tone)
-    if url:
-        return url
-    pool = MUSIC_CATALOG.get(tone or "trustworthy") or MUSIC_CATALOG["trustworthy"]
-    url = random.choice(pool)
-    print(f"[music] catalog fallback: {url}")
-    return url
+    api_key = os.environ.get("PIXABAY_API_KEY", "")
+    if api_key:
+        query = TONE_QUERIES.get(tone or "trustworthy", "corporate")
+        try:
+            res = requests.get(
+                "https://pixabay.com/api/",
+                params={
+                    "key": api_key,
+                    "q": query,
+                    "media_type": "music",
+                    "per_page": 20,
+                    "page": random.randint(1, 3),
+                },
+                timeout=10,
+            )
+            hits = res.json().get("hits", [])
+            if hits:
+                track = random.choice(hits)
+                url = track.get("audio", track.get("url", ""))
+                if url:
+                    print(f"[music] Pixabay track: {url}")
+                    return url
+        except Exception as exc:
+            print(f"[music] Pixabay fetch failed: {exc}")
+    fallback = os.environ.get("BACKGROUND_MUSIC_URL", "")
+    if fallback:
+        print(f"[music] fallback: {fallback}")
+    return fallback
 
 
 def make_background_music(duration: float, out_path: Path, music_url: str) -> Optional[Path]:
