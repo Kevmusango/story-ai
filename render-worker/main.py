@@ -378,23 +378,33 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
 
     rendered_clips2: list[Path] = []
     for i, src in enumerate(source_paths):
+        print(f"[render] rendering clip {i+1}/{len(source_paths)}")
         out = workdir / f"clip_{i}.mp4"
         render_clip(src, out, durations[i], i, width, height, keep_audio=False)
         rendered_clips2.append(out)
 
+    print("[render] concatenating clips")
     video_only = workdir / "video_only.mp4"
     concat_clips(rendered_clips2, durations, payload.tone or "trustworthy", payload.script_text or "", video_only)
 
+    print("[render] burning captions")
     captions = workdir / "captions.ass"
     make_ass(payload.script_text or "", total_duration, captions)
 
     captioned = workdir / "captioned.mp4"
     ass_path = css_escape_ass_path(captions)
-    run(["ffmpeg", "-y", "-i", str(video_only), "-vf", f"ass='{ass_path}'", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-an", str(captioned)])
+    try:
+        run(["ffmpeg", "-y", "-i", str(video_only), "-vf", f"ass='{ass_path}'", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", str(captioned)])
+    except Exception as e:
+        print(f"[render] caption burn failed ({e}), skipping captions")
+        shutil.copyfile(video_only, captioned)
 
+    print("[render] fetching music")
     final = workdir / "final.mp4"
     music = make_background_music(total_duration, workdir / "music.mp3", pick_music(payload.tone or "trustworthy"))
+    print(f"[render] music={'found' if music else 'none'}")
 
+    print("[render] mixing audio")
     if voice_path.exists() and music:
         run([
             "ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path), "-i", str(music),
@@ -413,6 +423,7 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
     else:
         shutil.copyfile(captioned, final)
 
+    print("[render] pipeline complete, uploading")
     return final
 
 
