@@ -310,10 +310,52 @@ MUSIC_CATALOG: dict[str, list[str]] = {
 }
 
 
+TONE_QUERIES: dict[str, str] = {
+    "trustworthy": "corporate",
+    "energetic":   "upbeat energetic",
+    "funny":       "fun happy",
+    "premium":     "cinematic",
+    "calm":        "calm relaxing",
+    "warm":        "acoustic inspirational",
+}
+
+
+def fetch_pixabay_music(tone: str) -> str:
+    api_key = os.environ.get("PIXABAY_API_KEY", "")
+    if not api_key:
+        return ""
+    query = TONE_QUERIES.get(tone or "trustworthy", "corporate")
+    try:
+        res = requests.get(
+            "https://pixabay.com/api/",
+            params={
+                "key": api_key,
+                "q": query,
+                "media_type": "music",
+                "per_page": 20,
+                "page": random.randint(1, 3),
+            },
+            timeout=10,
+        )
+        hits = res.json().get("hits", [])
+        if hits:
+            track = random.choice(hits)
+            url = track.get("audio", track.get("url", ""))
+            if url:
+                print(f"[music] Pixabay track: {url}")
+                return url
+    except Exception as exc:
+        print(f"[music] Pixabay fetch failed: {exc}")
+    return ""
+
+
 def pick_music(tone: str) -> str:
+    url = fetch_pixabay_music(tone)
+    if url:
+        return url
     pool = MUSIC_CATALOG.get(tone or "trustworthy") or MUSIC_CATALOG["trustworthy"]
     url = random.choice(pool)
-    print(f"[music] picked: {url}")
+    print(f"[music] catalog fallback: {url}")
     return url
 
 
