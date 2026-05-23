@@ -17,22 +17,20 @@ from supabase import create_client
 FPS = 30
 WIDTH = 1080
 HEIGHT = 1920
-BUCKET = "videos"
+BUCKET = "media"
 
 app = FastAPI(title="Story AI Render Worker")
 
 
 class RenderPayload(BaseModel):
-    videoId: str
-    userId: str
-    scriptText: Optional[str] = ""
-    openingLine: Optional[str] = "story"
+    video_id: str
+    user_id: str
+    script_text: Optional[str] = ""
+    clip_urls: Any = Field(default_factory=list)
+    voiceover_url: Optional[str] = ""
     tone: Optional[str] = "trustworthy"
-    stockUrls: Any = Field(default_factory=list)
-    assetUrls: Any = None
-    voiceoverUrl: Optional[str] = ""
-    platform: Optional[str] = "tiktok"
-    durationSeconds: Optional[int] = 30
+    duration_seconds: Optional[int] = 30
+    bucket: Optional[str] = "media"
 
 
 def run(cmd: list[str]) -> None:
@@ -234,8 +232,15 @@ def concat_clips(clips: list[Path], durations: list[float], tone: str, script: s
     run(["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(filters), "-map", current, "-an", "-pix_fmt", "yuv420p", str(out_path)])
 
 
-def make_background_music(duration: float, out_path: Path) -> Optional[Path]:
-    music_url = os.environ.get("BACKGROUND_MUSIC_URL")
+def get_music_url(asset_urls: Any) -> str:
+    if isinstance(asset_urls, dict):
+        music_url = asset_urls.get("musicUrl")
+        if isinstance(music_url, str) and music_url:
+            return music_url
+    return os.environ.get("BACKGROUND_MUSIC_URL", "")
+
+
+def make_background_music(duration: float, out_path: Path, music_url: str) -> Optional[Path]:
     if not music_url:
         return None
     raw = out_path.with_suffix(".music")
@@ -246,17 +251,17 @@ def make_background_music(duration: float, out_path: Path) -> Optional[Path]:
 
 
 def assemble(payload: RenderPayload, workdir: Path) -> Path:
-    urls = payload.stockUrls if isinstance(payload.stockUrls, list) else []
+    urls = payload.clip_urls if isinstance(payload.clip_urls, list) else []
     if not urls:
-        raise RuntimeError("No video assets available for export")
+        raise RuntimeError("No media assets provided for rendering")
 
     voice_path = workdir / "voiceover.mp3"
-    if payload.voiceoverUrl:
-        download(payload.voiceoverUrl, voice_path)
+    if payload.voiceover_url:
+        download(payload.voiceover_url, voice_path)
 
-    total_duration = detect_audio_duration(voice_path, float(payload.durationSeconds or 30)) if voice_path.exists() else float(payload.durationSeconds or 30)
+    total_duration = detect_audio_duration(voice_path, float(payload.duration_seconds or 30)) if voice_path.exists() else float(payload.duration_seconds or 30)
     pauses = detect_pause_points(voice_path, total_duration) if voice_path.exists() else []
-    durations = script_timings(payload.scriptText or "", len(urls), total_duration)
+    durations = script_timings(payload.script_text or "", len(urls), total_duration)
     durations = snap_to_pauses(durations, pauses, total_duration)
 
     source_paths: list[Path] = []
@@ -273,17 +278,17 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
         rendered_clips.append(out)
 
     video_only = workdir / "video_only.mp4"
-    concat_clips(rendered_clips, durations, payload.tone or "trustworthy", payload.scriptText or "", video_only)
+    concat_clips(rendered_clips, durations, payload.tone or "trustworthy", payload.script_text or "", video_only)
 
     captions = workdir / "captions.ass"
-    make_ass(payload.scriptText or "", total_duration, captions)
+    make_ass(payload.script_text or "", total_duration, captions)
 
     captioned = workdir / "captioned.mp4"
     ass_path = css_escape_ass_path(captions)
     run(["ffmpeg", "-y", "-i", str(video_only), "-vf", f"ass='{ass_path}'", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-an", str(captioned)])
 
     final = workdir / "final.mp4"
-    music = make_background_music(total_duration, workdir / "music.mp3")
+    music = make_background_music(total_duration, workdir / "music.mp3", os.environ.get("BACKGROUND_MUSIC_URL", ""))
 
     if voice_path.exists() and music:
         run([
@@ -293,6 +298,12 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
         ])
     elif voice_path.exists():
         run(["ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path), "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)])
+    elif music:
+        run([
+            "ffmpeg", "-y", "-i", str(captioned), "-i", str(music),
+            "-filter_complex", "[1:a]volume=0.75[a]",
+            "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)
+        ])
     else:
         shutil.copyfile(captioned, final)
 
@@ -322,7 +333,7 @@ def upload_final(video_id: str, user_id: str, final_path: Path) -> str:
         raise RuntimeError("Failed to create public export URL")
 
     supabase.table("videos").update({
-        "final_video_url": final_url,
+        "video_url": final_url,
         "render_status": "complete",
         "render_error": None,
         "rendered_at": datetime.now(timezone.utc).isoformat(),
@@ -333,15 +344,15 @@ def upload_final(video_id: str, user_id: str, final_path: Path) -> str:
 
 def render_job(payload: RenderPayload) -> None:
     supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
-    with tempfile.TemporaryDirectory(prefix=f"render-{payload.videoId}-") as tmp:
+    with tempfile.TemporaryDirectory(prefix=f"render-{payload.video_id}-") as tmp:
         workdir = Path(tmp)
         try:
-            supabase.table("videos").update({"render_status": "rendering", "render_error": None}).eq("id", payload.videoId).eq("user_id", payload.userId).execute()
+            supabase.table("videos").update({"render_status": "rendering", "render_error": None}).eq("id", payload.video_id).eq("user_id", payload.user_id).execute()
             final = assemble(payload, workdir)
-            upload_final(payload.videoId, payload.userId, final)
+            upload_final(payload.video_id, payload.user_id, final)
         except Exception as exc:
-            supabase.table("videos").update({"render_status": "failed", "render_error": "Video export failed. Please try again."}).eq("id", payload.videoId).eq("user_id", payload.userId).execute()
-            print(f"[render-worker] failed video={payload.videoId}: {exc}")
+            supabase.table("videos").update({"render_status": "failed", "render_error": "Video export failed. Please try again."}).eq("id", payload.video_id).eq("user_id", payload.user_id).execute()
+            print(f"[render-worker] failed video={payload.video_id}: {exc}")
 
 
 @app.get("/health")
@@ -355,10 +366,10 @@ def render(payload: RenderPayload, background_tasks: BackgroundTasks) -> dict[st
         raise HTTPException(status_code=500, detail="Storage is not configured")
 
     if os.environ.get("RENDER_SYNC") == "true":
-        with tempfile.TemporaryDirectory(prefix=f"render-{payload.videoId}-") as tmp:
+        with tempfile.TemporaryDirectory(prefix=f"render-{payload.video_id}-") as tmp:
             final = assemble(payload, Path(tmp))
-            final_url = upload_final(payload.videoId, payload.userId, final)
-            return {"finalVideoUrl": final_url}
+            final_url = upload_final(payload.video_id, payload.user_id, final)
+            return {"video_url": final_url}
 
     background_tasks.add_task(render_job, payload)
-    return {"status": "queued"}
+    return {"status": "queued", "video_id": payload.video_id}
