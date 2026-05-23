@@ -223,13 +223,19 @@ def face_crop_filter(path: Path, width: int, height: int) -> str:
 def render_clip(src: Path, dest: Path, duration: float, index: int,
                 width: int = 1080, height: int = 1920, keep_audio: bool = False) -> None:
     if is_image(src):
-        variants = [
-            "zoompan=z='min(zoom+0.0015,1.10)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'",
-            "zoompan=z='max(1.10-0.0015*on,1.0)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'",
-            "zoompan=z='1.06':d=1:x='(iw-iw/zoom)*on/120':y='ih/2-(ih/zoom/2)'",
-            "zoompan=z='1.06':d=1:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-on/120)'",
+        # Scale slightly oversized then crop — lightweight Ken Burns without zoompan frame buffering
+        crop_offsets = [
+            (f"iw*0.05*t/{duration}", f"ih*0.05*t/{duration}"),          # drift top-left→center
+            (f"iw*0.05*(1-t/{duration})", f"ih*0.05*(1-t/{duration})"),  # drift center→top-left
+            (f"iw*0.05*t/{duration}", "0"),                               # drift left→right
+            ("0", f"ih*0.05*t/{duration}"),                               # drift top→bottom
         ]
-        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},{variants[index % 4]}:s={width}x{height}:fps={FPS},setsar=1,format=yuv420p"
+        ox, oy = crop_offsets[index % 4]
+        vf = (
+            f"scale={int(width*1.06)}:{int(height*1.06)}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height}:x='{ox}':y='{oy}',"
+            f"fps={FPS},setsar=1,format=yuv420p"
+        )
         run(["ffmpeg", "-y", "-loop", "1", "-t", str(duration), "-i", str(src), "-vf", vf,
              "-c:v", "libx264", "-preset", "ultrafast", "-an", "-pix_fmt", "yuv420p", str(dest)])
     else:
