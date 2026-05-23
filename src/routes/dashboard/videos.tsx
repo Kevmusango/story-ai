@@ -76,13 +76,13 @@ function VideoCard({ video, onRetry, onDelete }: { video: VideoRow; onRetry: () 
   const handleDelete = async () => {
     setDeleting(true);
     setConfirmDelete(false);
-    try {
-      await supabase.from("videos").delete().eq("id", video.id);
-      toast.success("Video deleted");
-      onDelete();
-    } catch {
+    const { error } = await supabase.from("videos").delete().eq("id", video.id);
+    if (error) {
       toast.error("Failed to delete video");
       setDeleting(false);
+    } else {
+      toast.success("Video deleted");
+      onDelete();
     }
   };
 
