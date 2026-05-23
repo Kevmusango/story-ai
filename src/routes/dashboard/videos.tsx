@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import {
-  Film, Wand2, Loader2, Download, RefreshCw, Clock, CheckCircle2, AlertCircle, RotateCcw,
+  Film, Wand2, Loader2, Download, RefreshCw, Clock, CheckCircle2, AlertCircle, RotateCcw, Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -57,7 +57,7 @@ function timeAgo(iso: string) {
 
 // ─── Video Card ───────────────────────────────────────────────
 
-function VideoCard({ video, onRetry }: { video: VideoRow; onRetry: () => void }) {
+function VideoCard({ video, onRetry, onDelete }: { video: VideoRow; onRetry: () => void; onDelete: () => void }) {
   const status = STATUS[video.render_status as keyof typeof STATUS] ?? STATUS.pending;
   const StatusIcon = status.icon;
 
@@ -70,6 +70,20 @@ function VideoCard({ video, onRetry }: { video: VideoRow; onRetry: () => void })
   const businessType = video.projects?.business_type ?? "Business";
 
   const [retrying, setRetrying] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirm("Delete this video? This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      await supabase.from("videos").delete().eq("id", video.id);
+      toast.success("Video deleted");
+      onDelete();
+    } catch {
+      toast.error("Failed to delete video");
+      setDeleting(false);
+    }
+  };
 
   const handleRetry = async () => {
     setRetrying(true);
@@ -117,6 +131,14 @@ function VideoCard({ video, onRetry }: { video: VideoRow; onRetry: () => void })
             {status.label}
           </span>
           <span className="text-[10px] text-white/25">{timeAgo(video.created_at)}</span>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="p-1 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-40"
+            title="Delete video"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
@@ -278,7 +300,7 @@ function MyVideos() {
           </div>
         ) : (
           <div className="space-y-4">
-            {videos.map((v) => <VideoCard key={v.id} video={v} onRetry={fetchVideos} />)}
+            {videos.map((v) => <VideoCard key={v.id} video={v} onRetry={fetchVideos} onDelete={fetchVideos} />)}
           </div>
         )}
       </div>
