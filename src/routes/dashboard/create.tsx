@@ -111,21 +111,28 @@ function UploadStep({
       {files.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {files.map((file, i) => {
-            const isImage = file.type.startsWith("image/");
-            const preview = isImage ? URL.createObjectURL(file) : null;
+            const isVideo = file.type.startsWith("video/");
+            const preview = URL.createObjectURL(file);
             return (
-              <div key={i} className="relative group bg-[#0e0e12] border border-white/[0.06] rounded-xl overflow-hidden aspect-square">
-                {preview ? (
-                  <img src={preview} alt="" className="w-full h-full object-cover" />
+              <div key={i} className="relative bg-[#0e0e12] border border-white/[0.06] rounded-xl overflow-hidden aspect-square">
+                {isVideo ? (
+                  <video
+                    src={preview}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-1.5">
-                    <Film className="w-6 h-6 text-white/30" />
-                    <span className="text-[10px] text-white/30 px-2 text-center truncate w-full">{file.name}</span>
-                  </div>
+                  <img src={preview} alt="" className="w-full h-full object-cover" />
                 )}
+                <span className="absolute bottom-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-black/70 text-white/60 uppercase tracking-wider">
+                  {isVideo ? "video" : "image"}
+                </span>
                 <button
-                  className="absolute top-1 right-1 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                  className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/80 border border-white/10 rounded-full flex items-center justify-center hover:bg-red-500 hover:border-red-400 transition"
                   onClick={(e) => { e.stopPropagation(); onFiles(files.filter((_, fi) => fi !== i)); }}
+                  title="Remove"
                 >
                   <X className="w-3 h-3 text-white" />
                 </button>
