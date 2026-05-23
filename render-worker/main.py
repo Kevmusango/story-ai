@@ -23,6 +23,7 @@ from supabase import create_client
 
 FPS = 30
 BUCKET = "media"
+XFADE_DUR = 0.3  # crossfade duration between clips (seconds)
 
 FORMATS = {
     "portrait":  (720, 1280),
@@ -49,6 +50,7 @@ class RenderPayload(BaseModel):
     format: Optional[str] = "portrait"         # portrait | landscape | square
     use_original_audio: Optional[bool] = False  # keep source video audio
     caption_style: Optional[str] = "tiktok"     # tiktok | business | luxury
+    music_style: Optional[str]   = "auto"       # auto | acoustic | upbeat | cinematic | none
 
 
 def run(cmd: list[str]) -> None:
@@ -372,7 +374,7 @@ def concat_clips(clips: list[Path], durations: list[float], tone: str, script: s
         shutil.copyfile(clips[0], out_path)
         return
 
-    FADE = 0.3  # seconds crossfade overlap
+    FADE = XFADE_DUR  # seconds crossfade overlap
     current = clips[0]
     cur_dur = durations[0]
 
@@ -400,12 +402,20 @@ TONE_QUERIES: dict[str, str] = {
     "calm":        "calm relaxing",
     "warm":        "acoustic inspirational",
 }
+MUSIC_STYLE_QUERIES: dict[str, str] = {
+    "acoustic":  "acoustic guitar warm inspirational",
+    "upbeat":    "upbeat energetic pop fun",
+    "cinematic": "cinematic dramatic orchestral",
+}
 
 
-def pick_music(tone: str) -> str:
+def pick_music(tone_or_style: str) -> str:
     api_key = os.environ.get("PIXABAY_API_KEY", "")
     if api_key:
-        query = TONE_QUERIES.get(tone or "trustworthy", "corporate")
+        query = (
+            MUSIC_STYLE_QUERIES.get(tone_or_style)
+            or TONE_QUERIES.get(tone_or_style, "corporate background music")
+        )
         try:
             res = requests.get(
                 "https://pixabay.com/api/",
@@ -505,6 +515,11 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
     durations = script_timings(payload.script_text or "", len(urls), total_duration)
     durations = snap_to_pauses(durations, pauses, total_duration)
 
+    # Compensate for xfade overlap so final video length matches voiceover
+    if len(source_paths) > 1:
+        fade_bonus = (len(source_paths) - 1) * XFADE_DUR / len(source_paths)
+        durations = [d + fade_bonus for d in durations]
+
     rendered_clips2: list[Path] = []
     for i, src in enumerate(source_paths):
         print(f"[render] rendering clip {i+1}/{len(source_paths)}")
@@ -531,7 +546,13 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
 
     print("[render] fetching music")
     final = workdir / "final.mp4"
-    music = make_background_music(total_duration, workdir / "music.mp3", pick_music(payload.tone or "trustworthy"))
+    _mstyle = payload.music_style or "auto"
+    if _mstyle == "none":
+        music = None
+        print("[render] music disabled by user")
+    else:
+        _mquery = _mstyle if _mstyle != "auto" else (payload.tone or "trustworthy")
+        music = make_background_music(total_duration, workdir / "music.mp3", pick_music(_mquery))
     print(f"[render] music={'found' if music else 'none'}")
 
     has_voice = voice_path.exists()

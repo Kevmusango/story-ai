@@ -174,6 +174,7 @@ function ConfigureStep({
   videoFormat, onVideoFormat,
   useOriginalAudio, onUseOriginalAudio,
   durationSeconds, onDurationSeconds,
+  musicStyle, onMusicStyle,
   hasVideoFiles,
   onBack, onAnalyze, loading,
 }: {
@@ -183,6 +184,7 @@ function ConfigureStep({
   videoFormat: "portrait" | "landscape" | "square"; onVideoFormat: (v: "portrait" | "landscape" | "square") => void;
   useOriginalAudio: boolean; onUseOriginalAudio: (v: boolean) => void;
   durationSeconds: number; onDurationSeconds: (v: number) => void;
+  musicStyle: "auto" | "acoustic" | "upbeat" | "cinematic" | "none"; onMusicStyle: (v: "auto" | "acoustic" | "upbeat" | "cinematic" | "none") => void;
   hasVideoFiles: boolean;
   onBack: () => void; onAnalyze: () => void; loading: boolean;
 }) {
@@ -302,6 +304,33 @@ function ConfigureStep({
           </div>
         </div>
       )}
+
+      {/* Background music */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-white/50 uppercase tracking-widest">Background Music</label>
+        <div className="grid grid-cols-5 gap-1.5">
+          {([
+            { id: "auto"     as const, icon: "🎵", label: "Auto" },
+            { id: "acoustic" as const, icon: "🎸", label: "Acoustic" },
+            { id: "upbeat"   as const, icon: "⚡", label: "Upbeat" },
+            { id: "cinematic"as const, icon: "🎬", label: "Cinematic" },
+            { id: "none"     as const, icon: "🔇", label: "No Music" },
+          ]).map((opt) => (
+            <button
+              key={opt.id}
+              onClick={() => onMusicStyle(opt.id)}
+              className={`p-2.5 rounded-xl border text-center transition-all ${
+                musicStyle === opt.id
+                  ? "border-[#c8ff00] bg-[#c8ff00]/[0.06]"
+                  : "border-white/[0.06] bg-[#0e0e12] hover:border-white/15"
+              }`}
+            >
+              <div className="text-lg mb-0.5">{opt.icon}</div>
+              <p className="text-[10px] font-semibold text-white leading-tight">{opt.label}</p>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Persona picker */}
       <div className="space-y-2">
@@ -553,6 +582,7 @@ function CreatePage() {
   const [personaId, setPersonaId] = useState<PersonaId | null>(null);
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyleId>("warm");
   const [captionStyle, setCaptionStyle] = useState<"tiktok" | "business" | "luxury">("tiktok");
+  const [musicStyle, setMusicStyle] = useState<"auto" | "acoustic" | "upbeat" | "cinematic" | "none">("auto");
   const [videoFormat, setVideoFormat] = useState<"portrait" | "landscape" | "square">("portrait");
   const [useOriginalAudio, setUseOriginalAudio] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(30);
@@ -622,7 +652,7 @@ function CreatePage() {
       setStep("analyzing");
 
       // 3. Call AI analysis server function
-      const result = await analyzeMedia({ data: { projectId: project.id } });
+      const result = await analyzeMedia({ data: { projectId: project.id, durationSeconds } });
       setGenerationId(result.generationId);
       setAngles(result.angles);
       setMediaAnalysis(result.mediaAnalysis);
@@ -643,7 +673,7 @@ function CreatePage() {
     setStep("generating");
     try {
       await generateVideo({
-        data: { generationId, selectedAngleId, voiceStyle, videoFormat, useOriginalAudio, durationSeconds, captionStyle },
+        data: { generationId, selectedAngleId, voiceStyle, videoFormat, useOriginalAudio, durationSeconds, captionStyle, musicStyle },
       });
       navigate({ to: "/dashboard/videos" });
     } catch (err) {
@@ -684,6 +714,7 @@ function CreatePage() {
             videoFormat={videoFormat} onVideoFormat={setVideoFormat}
             useOriginalAudio={useOriginalAudio} onUseOriginalAudio={setUseOriginalAudio}
             durationSeconds={durationSeconds} onDurationSeconds={setDurationSeconds}
+            musicStyle={musicStyle} onMusicStyle={setMusicStyle}
             hasVideoFiles={files.some(f => f.type.startsWith("video/"))}
             onBack={() => setStep("upload")}
             onAnalyze={handleAnalyze}

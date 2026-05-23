@@ -79,6 +79,7 @@ async function generateAngles(params: {
   persona: ReturnType<typeof getPersona>;
   contentGoal: ReturnType<typeof getContentGoal>;
   businessType: string | null;
+  durationSeconds: number;
 }): Promise<GPT4oOutput> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -112,7 +113,7 @@ Power Words: ${params.persona.powerWords.join(", ")}
 
 ${goalRule}
 
-Generate exactly 5 x 30-second video scripts. Each uses a different psychological angle.
+Generate exactly 5 x ${params.durationSeconds}-second video scripts. Each script must be approximately ${Math.round(params.durationSeconds * 2.5)} spoken words total (hook + body + cta combined). Each uses a different psychological angle.
 Scripts must be tight, punchy, and speak ONLY to this persona's deepest emotions.
 
 ANGLES (use these exact IDs):
@@ -158,8 +159,11 @@ Output ONLY valid JSON — no markdown, no explanation:
 // ─── Server Function ──────────────────────────────────────────
 
 export const analyzeMedia = createServerFn()
-  .inputValidator(z.object({ projectId: z.string().uuid() }))
-  .handler(async ({ data: { projectId } }) => {
+  .inputValidator(z.object({
+    projectId: z.string().uuid(),
+    durationSeconds: z.number().int().min(10).max(60).default(30),
+  }))
+  .handler(async ({ data: { projectId, durationSeconds } }) => {
     const supabase = createClient<Database>(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -232,13 +236,14 @@ export const analyzeMedia = createServerFn()
         persona,
         contentGoal,
         businessType: project.business_type,
+        durationSeconds,
       });
 
       await supabase
         .from("generations")
         .update({
-          media_analysis: result.media_analysis,
-          angles: result.angles,
+          media_analysis: result.media_analysis as unknown as import("@/integrations/supabase/types").Json,
+          angles: result.angles as unknown as import("@/integrations/supabase/types").Json,
           status: "angles_ready",
         })
         .eq("id", generation.id);

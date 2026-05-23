@@ -157,7 +157,7 @@ function VideoCard({ video, onRetry, onDelete }: { video: VideoRow; onRetry: () 
           <video
             src={video.video_url}
             controls
-            className="w-full rounded-xl bg-black aspect-video"
+            className="rounded-xl bg-black max-h-[500px] max-w-full mx-auto block"
           />
         </div>
       )}
