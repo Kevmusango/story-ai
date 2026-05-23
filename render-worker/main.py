@@ -1,5 +1,6 @@
 import math
 import os
+import random
 import shutil
 import subprocess
 import tempfile
@@ -272,11 +273,43 @@ def concat_clips(clips: list[Path], durations: list[float], tone: str, script: s
     run(["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(filters), "-map", current, "-an", "-pix_fmt", "yuv420p", str(out_path)])
 
 
-def get_music_url(asset_urls: Any) -> str:
-    if isinstance(asset_urls, dict):
-        music_url = asset_urls.get("musicUrl")
-        if isinstance(music_url, str) and music_url:
-            return music_url
+TONE_TAGS: dict[str, str] = {
+    "trustworthy": "corporate background",
+    "energetic":   "upbeat energetic",
+    "funny":       "fun upbeat",
+    "premium":     "cinematic corporate",
+    "calm":        "ambient calm",
+    "warm":        "acoustic warm",
+}
+
+
+def fetch_jamendo_music(tone: str) -> str:
+    client_id = os.environ.get("JAMENDO_CLIENT_ID", "")
+    if not client_id:
+        return os.environ.get("BACKGROUND_MUSIC_URL", "")
+    tags = TONE_TAGS.get(tone or "trustworthy", "corporate background")
+    offset = random.randint(0, 40)
+    try:
+        res = requests.get(
+            "https://api.jamendo.com/v3.0/tracks/",
+            params={
+                "client_id": client_id,
+                "format": "json",
+                "limit": 10,
+                "tags": tags,
+                "audioformat": "mp32",
+                "offset": offset,
+            },
+            timeout=10,
+        )
+        tracks = res.json().get("results", [])
+        if tracks:
+            url = random.choice(tracks).get("audio", "")
+            if url:
+                print(f"[music] Jamendo track: {url}")
+                return url
+    except Exception as exc:
+        print(f"[music] Jamendo fetch failed: {exc}")
     return os.environ.get("BACKGROUND_MUSIC_URL", "")
 
 
@@ -357,7 +390,7 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
     run(["ffmpeg", "-y", "-i", str(video_only), "-vf", f"ass='{ass_path}'", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-an", str(captioned)])
 
     final = workdir / "final.mp4"
-    music = make_background_music(total_duration, workdir / "music.mp3", os.environ.get("BACKGROUND_MUSIC_URL", ""))
+    music = make_background_music(total_duration, workdir / "music.mp3", fetch_jamendo_music(payload.tone or "trustworthy"))
 
     if voice_path.exists() and music:
         run([
