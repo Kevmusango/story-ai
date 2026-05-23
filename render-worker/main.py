@@ -164,34 +164,51 @@ def sentence_is_punchy(script: str, index: int, clip_count: int) -> bool:
 
 
 def make_ass(script: str, total_duration: float, out_path: Path) -> None:
-    words = script.split()
-    chunks = [" ".join(words[i:i + 3]) for i in range(0, len(words), 3)] or [script or ""]
-    chunk_duration = total_duration / max(len(chunks), 1)
+    words = [w for w in script.split() if w]
+    if not words:
+        words = [script.strip() or "..."]
 
-    def ts(seconds: float) -> str:
-        h = int(seconds // 3600)
-        m = int((seconds % 3600) // 60)
-        s = seconds % 60
-        return f"{h}:{m:02d}:{s:05.2f}"
+    CHUNK = 2
+    chunks: list[list[str]] = [words[i:i + CHUNK] for i in range(0, len(words), CHUNK)]
+    chunk_dur = total_duration / max(len(chunks), 1)
 
-    header = """[Script Info]
-ScriptType: v4.00+
-PlayResX: 1080
-PlayResY: 1920
+    def ts(s: float) -> str:
+        h = int(s // 3600)
+        m = int((s % 3600) // 60)
+        sec = s % 60
+        return f"{h}:{m:02d}:{sec:05.2f}"
 
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,76,&H00FFFFFF,&H00FFFFFF,&H7A000000,&H99000000,-1,0,0,0,100,100,0,0,1,4,2,2,90,90,220,1
+    BRAND  = "&H0000FFC8&"   # #c8ff00 brand accent (ASS AABBGGRR)
+    WHITE  = "&H00FFFFFF&"
+    SHADOW = "&H99000000&"
 
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
+    header = (
+        "[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\n\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
+        "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Default,Arial,68,{WHITE},{WHITE},&H00000000,{SHADOW},-1,0,0,0,100,100,1,0,1,4,2,2,60,60,180,1\n\n"
+        "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+
     lines = [header]
     for i, chunk in enumerate(chunks):
-        start = i * chunk_duration
-        end = min(total_duration, start + chunk_duration)
-        text = chunk.replace("{", "").replace("}", "")
-        lines.append(f"Dialogue: 0,{ts(start)},{ts(end)},Default,,0,0,0,,{text}\n")
+        chunk_start = i * chunk_dur
+        word_dur = chunk_dur / max(len(chunk), 1)
+        for j, word in enumerate(chunk):
+            w_start = chunk_start + j * word_dur
+            w_end   = chunk_start + (j + 1) * word_dur
+            parts = []
+            for k, w in enumerate(chunk):
+                clean = w.replace("{", "").replace("}", "")
+                if k == j:
+                    parts.append(f"{{\\c{BRAND}\\b1\\fscx110\\fscy110}}{clean}{{\\r}}")
+                else:
+                    parts.append(f"{{\\alpha&H60&}}{clean}{{\\r}}")
+            text = " ".join(parts)
+            lines.append(f"Dialogue: 0,{ts(w_start)},{ts(w_end)},Default,,0,0,0,,{text}\n")
+
     out_path.write_text("".join(lines), encoding="utf-8")
 
 
@@ -223,17 +240,21 @@ def face_crop_filter(path: Path, width: int, height: int) -> str:
 def render_clip(src: Path, dest: Path, duration: float, index: int,
                 width: int = 1080, height: int = 1920, keep_audio: bool = False) -> None:
     if is_image(src):
-        # Scale slightly oversized then crop — lightweight Ken Burns without zoompan frame buffering
-        crop_offsets = [
-            (f"iw*0.05*t/{duration}", f"ih*0.05*t/{duration}"),          # drift top-left→center
-            (f"iw*0.05*(1-t/{duration})", f"ih*0.05*(1-t/{duration})"),  # drift center→top-left
-            (f"iw*0.05*t/{duration}", "0"),                               # drift left→right
-            ("0", f"ih*0.05*t/{duration}"),                               # drift top→bottom
+        big_w = int(width * 1.10)
+        big_h = int(height * 1.10)
+        d = max(duration, 0.1)
+        # Real Ken Burns: scale eval=frame zooms per-frame (no buffering) + time-varying crop pans
+        variants = [
+            (f"iw*(1+0.05*t/{d:.3f})",       f"ih*(1+0.05*t/{d:.3f})",       f"(iw-{width})*t/{d:.3f}",         f"(ih-{height})/2"),
+            (f"iw*(1.05-0.05*t/{d:.3f})",     f"ih*(1.05-0.05*t/{d:.3f})",     f"(iw-{width})*(1-t/{d:.3f})",     f"(ih-{height})/2"),
+            (f"iw*(1+0.05*t/{d:.3f})",       f"ih*(1+0.05*t/{d:.3f})",       f"(iw-{width})/2",                 f"(ih-{height})*t/{d:.3f}"),
+            (f"iw*(1+0.05*t/{d:.3f})",       f"ih*(1+0.05*t/{d:.3f})",       f"(iw-{width})*(1-t/{d:.3f})",     f"(ih-{height})*(1-t/{d:.3f})"),
         ]
-        ox, oy = crop_offsets[index % 4]
+        sw, sh, cx, cy = variants[index % 4]
         vf = (
-            f"scale={int(width*1.06)}:{int(height*1.06)}:force_original_aspect_ratio=increase,"
-            f"crop={width}:{height}:x='{ox}':y='{oy}',"
+            f"scale={big_w}:{big_h}:force_original_aspect_ratio=increase,"
+            f"scale=w='{sw}':h='{sh}':eval=frame:flags=bilinear,"
+            f"crop={width}:{height}:x='{cx}':y='{cy}',"
             f"fps={FPS},setsar=1,format=yuv420p"
         )
         run(["ffmpeg", "-y", "-loop", "1", "-t", str(duration), "-i", str(src), "-vf", vf,
@@ -265,10 +286,24 @@ def concat_clips(clips: list[Path], durations: list[float], tone: str, script: s
         shutil.copyfile(clips[0], out_path)
         return
 
-    concat_file = out_path.with_name("concat_list.txt")
-    concat_file.write_text("\n".join(f"file '{c}'" for c in clips), encoding="utf-8")
-    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
-         "-c", "copy", str(out_path)])
+    FADE = 0.3  # seconds crossfade overlap
+    current = clips[0]
+    cur_dur = durations[0]
+
+    for i in range(1, len(clips)):
+        is_last = (i == len(clips) - 1)
+        merged = out_path if is_last else out_path.with_name(f"merge_{i}.mp4")
+        offset = max(0.5, cur_dur - FADE)
+        run([
+            "ffmpeg", "-y", "-i", str(current), "-i", str(clips[i]),
+            "-filter_complex",
+            f"[0:v][1:v]xfade=transition=fade:duration={FADE}:offset={offset:.3f}[v]",
+            "-map", "[v]", "-an",
+            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+            str(merged)
+        ])
+        current = merged
+        cur_dur = cur_dur + durations[i] - FADE
 
 
 TONE_QUERIES: dict[str, str] = {
@@ -402,7 +437,8 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
     captioned = workdir / "captioned.mp4"
     ass_path = css_escape_ass_path(captions)
     try:
-        run(["ffmpeg", "-y", "-i", str(video_only), "-vf", f"ass='{ass_path}'", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", str(captioned)])
+        COLOR_GRADE = "eq=contrast=1.08:brightness=0.02:saturation=1.12,vignette=PI/6"
+        run(["ffmpeg", "-y", "-i", str(video_only), "-vf", f"{COLOR_GRADE},ass='{ass_path}'", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an", str(captioned)])
     except Exception as e:
         print(f"[render] caption burn failed ({e}), skipping captions")
         shutil.copyfile(video_only, captioned)
