@@ -364,8 +364,13 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
 
     # ── AI voiceover path ────────────────────────────────────────
     voice_path = workdir / "voiceover.mp3"
+    print(f"[render] voiceover={'downloading' if payload.voiceover_url else 'NONE (no URL received)'}")
     if payload.voiceover_url:
-        download(payload.voiceover_url, voice_path)
+        try:
+            download(payload.voiceover_url, voice_path)
+            print(f"[render] voiceover downloaded {voice_path.stat().st_size} bytes")
+        except Exception as e:
+            print(f"[render] voiceover download failed: {e}")
 
     total_duration = detect_audio_duration(voice_path, float(payload.duration_seconds or 30)) if voice_path.exists() else float(payload.duration_seconds or 30)
     pauses = detect_pause_points(voice_path, total_duration) if voice_path.exists() else []
@@ -400,14 +405,15 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
     music = make_background_music(total_duration, workdir / "music.mp3", pick_music(payload.tone or "trustworthy"))
     print(f"[render] music={'found' if music else 'none'}")
 
-    print("[render] mixing audio")
-    if voice_path.exists() and music:
+    has_voice = voice_path.exists()
+    print(f"[render] mixing audio voice={has_voice} music={bool(music)}")
+    if has_voice and music:
         run([
             "ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path), "-i", str(music),
             "-filter_complex", "[1:a]volume=1.0[a1];[2:a]volume=0.25[a2];[a1][a2]amix=inputs=2:duration=first[a]",
             "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)
         ])
-    elif voice_path.exists():
+    elif has_voice:
         run(["ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path),
              "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)])
     elif music:
@@ -417,6 +423,7 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
             "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)
         ])
     else:
+        print("[render] WARNING: no voice and no music — output will be silent")
         shutil.copyfile(captioned, final)
 
     print("[render] pipeline complete, uploading")
