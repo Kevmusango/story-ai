@@ -140,11 +140,20 @@ function VideoCard({ video, onRetry }: { video: VideoRow; onRetry: () => void })
       )}
 
       {/* Pending/rendering message */}
-      {(video.render_status === "pending" || video.render_status === "rendering") && (
+      {(video.render_status === "pending" || video.render_status === "rendering") && (() => {
+        const minutesOld = (Date.now() - new Date(video.created_at).getTime()) / 60000;
+        const isStuck = video.render_status === "rendering" && minutesOld > 10;
+        return (
         <div className="px-4 pb-4 space-y-2">
-          <div className="flex items-center gap-2 bg-white/[0.03] rounded-xl px-3 py-2.5">
-            <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin flex-shrink-0" />
-            <p className="text-xs text-white/40">Your video is being rendered. Page updates automatically.</p>
+          <div className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${isStuck ? "bg-amber-500/[0.08]" : "bg-white/[0.03]"}`}>
+            {isStuck
+              ? <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+              : <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin flex-shrink-0" />}
+            <p className="text-xs text-white/40">
+              {isStuck
+                ? "Render is taking unusually long. The worker may have timed out — click Retry."
+                : "Your video is being rendered. Page updates automatically."}
+            </p>
           </div>
           <button
             onClick={handleRetry}
@@ -155,7 +164,8 @@ function VideoCard({ video, onRetry }: { video: VideoRow; onRetry: () => void })
             {retrying ? "Retrying..." : "Retry render"}
           </button>
         </div>
-      )}
+        );
+      })()}
 
       {/* Failed message */}
       {video.render_status === "failed" && (

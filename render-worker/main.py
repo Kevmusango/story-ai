@@ -7,9 +7,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-import cv2
-import librosa
 import requests
+try:
+    import cv2 as _cv2
+except Exception:
+    _cv2 = None  # type: ignore
+try:
+    import librosa as _librosa
+except Exception:
+    _librosa = None  # type: ignore
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from supabase import create_client
@@ -77,17 +83,21 @@ def split_sentences(script: str) -> list[str]:
 
 
 def detect_audio_duration(audio_path: Path, fallback: float) -> float:
+    if _librosa is None:
+        return fallback
     try:
-        y, sr = librosa.load(str(audio_path), sr=None, mono=True)
-        return float(librosa.get_duration(y=y, sr=sr))
+        y, sr = _librosa.load(str(audio_path), sr=None, mono=True)
+        return float(_librosa.get_duration(y=y, sr=sr))
     except Exception:
         return fallback
 
 
 def detect_pause_points(audio_path: Path, total_duration: float) -> list[float]:
+    if _librosa is None:
+        return []
     try:
-        y, sr = librosa.load(str(audio_path), sr=None, mono=True)
-        intervals = librosa.effects.split(y, top_db=32, frame_length=2048, hop_length=512)
+        y, sr = _librosa.load(str(audio_path), sr=None, mono=True)
+        intervals = _librosa.effects.split(y, top_db=32, frame_length=2048, hop_length=512)
         pauses: list[float] = []
         previous_end = 0
         for start, end in intervals:
@@ -181,14 +191,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 
 def face_crop_filter(path: Path, width: int, height: int) -> str:
+    if _cv2 is None:
+        return f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}"
     try:
-        cap = cv2.VideoCapture(str(path))
+        cap = _cv2.VideoCapture(str(path))
         ok, frame = cap.read()
         cap.release()
         if not ok or frame is None:
             return f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}"
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        gray = _cv2.cvtColor(frame, _cv2.COLOR_BGR2GRAY)
+        cascade = _cv2.CascadeClassifier(_cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
         faces = cascade.detectMultiScale(gray, 1.1, 4)
         if len(faces) == 0:
             return f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}:(iw-{width})/2:(ih-{height})*0.22"
