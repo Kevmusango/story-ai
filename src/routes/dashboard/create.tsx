@@ -148,6 +148,12 @@ function UploadStep({
 
 // ─── Step 2: Configure ────────────────────────────────────────
 
+const VIDEO_DURATIONS = [
+  { id: 10, label: "10s", sub: "Quick hook" },
+  { id: 15, label: "15s", sub: "Standard" },
+  { id: 30, label: "30s", sub: "Full story" },
+];
+
 const VIDEO_FORMATS = [
   { id: "portrait" as const,  label: "Portrait",  sub: "9:16  TikTok · Reels · Shorts",  icon: "📱" },
   { id: "landscape" as const, label: "Landscape", sub: "16:9  YouTube · Facebook",        icon: "🖥️" },
@@ -160,6 +166,7 @@ function ConfigureStep({
   personaId, onPersona,
   videoFormat, onVideoFormat,
   useOriginalAudio, onUseOriginalAudio,
+  durationSeconds, onDurationSeconds,
   hasVideoFiles,
   onBack, onAnalyze, loading,
 }: {
@@ -168,6 +175,7 @@ function ConfigureStep({
   personaId: PersonaId | null; onPersona: (v: PersonaId) => void;
   videoFormat: "portrait" | "landscape" | "square"; onVideoFormat: (v: "portrait" | "landscape" | "square") => void;
   useOriginalAudio: boolean; onUseOriginalAudio: (v: boolean) => void;
+  durationSeconds: number; onDurationSeconds: (v: number) => void;
   hasVideoFiles: boolean;
   onBack: () => void; onAnalyze: () => void; loading: boolean;
 }) {
@@ -213,6 +221,27 @@ function ConfigureStep({
               </div>
               <p className="text-[11px] text-white/40 leading-snug">{goal.description}</p>
               <p className="text-[10px] text-white/25 mt-1 italic">{goal.tone}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Video duration */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-white/50 uppercase tracking-widest">Video Length</label>
+        <div className="grid grid-cols-3 gap-2">
+          {VIDEO_DURATIONS.map((d) => (
+            <button
+              key={d.id}
+              onClick={() => onDurationSeconds(d.id)}
+              className={`p-3 rounded-xl border text-center transition-all ${
+                durationSeconds === d.id
+                  ? "border-[#c8ff00] bg-[#c8ff00]/[0.07]"
+                  : "border-white/[0.07] bg-[#0e0e12] hover:border-white/20"
+              }`}
+            >
+              <div className="text-sm font-bold text-white">{d.label}</div>
+              <div className="text-[10px] text-white/30 mt-0.5">{d.sub}</div>
             </button>
           ))}
         </div>
@@ -489,6 +518,7 @@ function CreatePage() {
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyleId>("warm");
   const [videoFormat, setVideoFormat] = useState<"portrait" | "landscape" | "square">("portrait");
   const [useOriginalAudio, setUseOriginalAudio] = useState(false);
+  const [durationSeconds, setDurationSeconds] = useState(30);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [angles, setAngles] = useState<AngleOutput[]>([]);
@@ -576,7 +606,7 @@ function CreatePage() {
     setStep("generating");
     try {
       await generateVideo({
-        data: { generationId, selectedAngleId, voiceStyle, videoFormat, useOriginalAudio },
+        data: { generationId, selectedAngleId, voiceStyle, videoFormat, useOriginalAudio, durationSeconds },
       });
       navigate({ to: "/dashboard/videos" });
     } catch (err) {
@@ -616,6 +646,7 @@ function CreatePage() {
             personaId={personaId} onPersona={(id) => setPersonaId(id)}
             videoFormat={videoFormat} onVideoFormat={setVideoFormat}
             useOriginalAudio={useOriginalAudio} onUseOriginalAudio={setUseOriginalAudio}
+            durationSeconds={durationSeconds} onDurationSeconds={setDurationSeconds}
             hasVideoFiles={files.some(f => f.type.startsWith("video/"))}
             onBack={() => setStep("upload")}
             onAnalyze={handleAnalyze}
