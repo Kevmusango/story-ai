@@ -9,8 +9,8 @@ export const Route = createFileRoute("/signup")({
   component: SignupPage,
   head: () => ({
     meta: [
-      { title: "Sign up — StoryLens AI" },
-      { name: "description", content: "Create your StoryLens AI account and turn your business into cinematic story videos." },
+      { title: "Sign up — AdEngine AI" },
+      { name: "description", content: "Create your AdEngine AI account and start making emotionally targeted marketing videos." },
     ],
   }),
 });

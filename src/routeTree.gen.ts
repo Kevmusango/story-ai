@@ -15,11 +15,8 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardVideosRouteImport } from './routes/dashboard/videos'
-import { Route as DashboardUploadRouteImport } from './routes/dashboard/upload'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard/settings'
-import { Route as DashboardQuickRouteImport } from './routes/dashboard/quick'
-import { Route as DashboardAdvancedRouteImport } from './routes/dashboard/advanced'
-import { Route as DashboardResultVideoIdRouteImport } from './routes/dashboard/result.$videoId'
+import { Route as DashboardCreateRouteImport } from './routes/dashboard/create'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -51,29 +48,14 @@ const DashboardVideosRoute = DashboardVideosRouteImport.update({
   path: '/videos',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardUploadRoute = DashboardUploadRouteImport.update({
-  id: '/upload',
-  path: '/upload',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardQuickRoute = DashboardQuickRouteImport.update({
-  id: '/quick',
-  path: '/quick',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardAdvancedRoute = DashboardAdvancedRouteImport.update({
-  id: '/advanced',
-  path: '/advanced',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardResultVideoIdRoute = DashboardResultVideoIdRouteImport.update({
-  id: '/result/$videoId',
-  path: '/result/$videoId',
+const DashboardCreateRoute = DashboardCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
   getParentRoute: () => DashboardRoute,
 } as any)
 
@@ -82,25 +64,19 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/dashboard/advanced': typeof DashboardAdvancedRoute
-  '/dashboard/quick': typeof DashboardQuickRoute
+  '/dashboard/create': typeof DashboardCreateRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
-  '/dashboard/upload': typeof DashboardUploadRoute
   '/dashboard/videos': typeof DashboardVideosRoute
   '/dashboard/': typeof DashboardIndexRoute
-  '/dashboard/result/$videoId': typeof DashboardResultVideoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/dashboard/advanced': typeof DashboardAdvancedRoute
-  '/dashboard/quick': typeof DashboardQuickRoute
+  '/dashboard/create': typeof DashboardCreateRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
-  '/dashboard/upload': typeof DashboardUploadRoute
   '/dashboard/videos': typeof DashboardVideosRoute
   '/dashboard': typeof DashboardIndexRoute
-  '/dashboard/result/$videoId': typeof DashboardResultVideoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -108,13 +84,10 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/dashboard/advanced': typeof DashboardAdvancedRoute
-  '/dashboard/quick': typeof DashboardQuickRoute
+  '/dashboard/create': typeof DashboardCreateRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
-  '/dashboard/upload': typeof DashboardUploadRoute
   '/dashboard/videos': typeof DashboardVideosRoute
   '/dashboard/': typeof DashboardIndexRoute
-  '/dashboard/result/$videoId': typeof DashboardResultVideoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -123,38 +96,29 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/signup'
-    | '/dashboard/advanced'
-    | '/dashboard/quick'
+    | '/dashboard/create'
     | '/dashboard/settings'
-    | '/dashboard/upload'
     | '/dashboard/videos'
     | '/dashboard/'
-    | '/dashboard/result/$videoId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/signup'
-    | '/dashboard/advanced'
-    | '/dashboard/quick'
+    | '/dashboard/create'
     | '/dashboard/settings'
-    | '/dashboard/upload'
     | '/dashboard/videos'
     | '/dashboard'
-    | '/dashboard/result/$videoId'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
     | '/login'
     | '/signup'
-    | '/dashboard/advanced'
-    | '/dashboard/quick'
+    | '/dashboard/create'
     | '/dashboard/settings'
-    | '/dashboard/upload'
     | '/dashboard/videos'
     | '/dashboard/'
-    | '/dashboard/result/$videoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -208,13 +172,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardVideosRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/upload': {
-      id: '/dashboard/upload'
-      path: '/upload'
-      fullPath: '/dashboard/upload'
-      preLoaderRoute: typeof DashboardUploadRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/dashboard/settings': {
       id: '/dashboard/settings'
       path: '/settings'
@@ -222,48 +179,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/quick': {
-      id: '/dashboard/quick'
-      path: '/quick'
-      fullPath: '/dashboard/quick'
-      preLoaderRoute: typeof DashboardQuickRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/advanced': {
-      id: '/dashboard/advanced'
-      path: '/advanced'
-      fullPath: '/dashboard/advanced'
-      preLoaderRoute: typeof DashboardAdvancedRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/result/$videoId': {
-      id: '/dashboard/result/$videoId'
-      path: '/result/$videoId'
-      fullPath: '/dashboard/result/$videoId'
-      preLoaderRoute: typeof DashboardResultVideoIdRouteImport
+    '/dashboard/create': {
+      id: '/dashboard/create'
+      path: '/create'
+      fullPath: '/dashboard/create'
+      preLoaderRoute: typeof DashboardCreateRouteImport
       parentRoute: typeof DashboardRoute
     }
   }
 }
 
 interface DashboardRouteChildren {
-  DashboardAdvancedRoute: typeof DashboardAdvancedRoute
-  DashboardQuickRoute: typeof DashboardQuickRoute
+  DashboardCreateRoute: typeof DashboardCreateRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
-  DashboardUploadRoute: typeof DashboardUploadRoute
   DashboardVideosRoute: typeof DashboardVideosRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
-  DashboardResultVideoIdRoute: typeof DashboardResultVideoIdRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
-  DashboardAdvancedRoute: DashboardAdvancedRoute,
-  DashboardQuickRoute: DashboardQuickRoute,
+  DashboardCreateRoute: DashboardCreateRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
-  DashboardUploadRoute: DashboardUploadRoute,
   DashboardVideosRoute: DashboardVideosRoute,
   DashboardIndexRoute: DashboardIndexRoute,
-  DashboardResultVideoIdRoute: DashboardResultVideoIdRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
-  "/dashboard/quick": "Quick Mode",
+  "/dashboard/quick": "Quick Video",
   "/dashboard/advanced": "Advanced Mode",
   "/dashboard/upload": "Upload Mode",
   "/dashboard/videos": "My Videos",
@@ -125,3 +125,4 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
     </header>
   );
 }
+

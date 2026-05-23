@@ -15,9 +15,17 @@ from pydantic import BaseModel, Field
 from supabase import create_client
 
 FPS = 30
-WIDTH = 1080
-HEIGHT = 1920
 BUCKET = "media"
+
+FORMATS = {
+    "portrait":  (1080, 1920),
+    "landscape": (1920, 1080),
+    "square":    (1080, 1080),
+}
+
+
+def get_dimensions(fmt: str) -> tuple[int, int]:
+    return FORMATS.get(fmt or "portrait", (1080, 1920))
 
 app = FastAPI(title="Story AI Render Worker")
 
@@ -31,6 +39,8 @@ class RenderPayload(BaseModel):
     tone: Optional[str] = "trustworthy"
     duration_seconds: Optional[int] = 30
     bucket: Optional[str] = "media"
+    format: Optional[str] = "portrait"         # portrait | landscape | square
+    use_original_audio: Optional[bool] = False  # keep source video audio
 
 
 def run(cmd: list[str]) -> None:
@@ -170,30 +180,31 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     out_path.write_text("".join(lines), encoding="utf-8")
 
 
-def face_crop_filter(path: Path) -> str:
+def face_crop_filter(path: Path, width: int, height: int) -> str:
     try:
         cap = cv2.VideoCapture(str(path))
         ok, frame = cap.read()
         cap.release()
         if not ok or frame is None:
-            return f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT}"
+            return f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}"
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
         faces = cascade.detectMultiScale(gray, 1.1, 4)
         if len(faces) == 0:
-            return f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT}:(iw-{WIDTH})/2:(ih-{HEIGHT})*0.22"
+            return f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}:(iw-{width})/2:(ih-{height})*0.22"
         x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
         frame_h, frame_w = frame.shape[:2]
         cx = (x + w / 2) / frame_w
         cy = (y + h / 2) / frame_h
-        crop_x = f"max(0\\,min(iw-{WIDTH}\\,{cx:.4f}*iw-{WIDTH / 2:.0f}))"
-        crop_y = f"max(0\\,min(ih-{HEIGHT}\\,{cy:.4f}*ih-{HEIGHT * 0.38:.0f}))"
-        return f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT}:{crop_x}:{crop_y}"
+        crop_x = f"max(0\\,min(iw-{width}\\,{cx:.4f}*iw-{width / 2:.0f}))"
+        crop_y = f"max(0\\,min(ih-{height}\\,{cy:.4f}*ih-{height * 0.38:.0f}))"
+        return f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}:{crop_x}:{crop_y}"
     except Exception:
-        return f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT}"
+        return f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}"
 
 
-def render_clip(src: Path, dest: Path, duration: float, index: int) -> None:
+def render_clip(src: Path, dest: Path, duration: float, index: int,
+                width: int = 1080, height: int = 1920, keep_audio: bool = False) -> None:
     if is_image(src):
         variants = [
             "zoompan=z='min(zoom+0.0015,1.10)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'",
@@ -201,11 +212,28 @@ def render_clip(src: Path, dest: Path, duration: float, index: int) -> None:
             "zoompan=z='1.06':d=1:x='(iw-iw/zoom)*on/120':y='ih/2-(ih/zoom/2)'",
             "zoompan=z='1.06':d=1:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-on/120)'",
         ]
-        vf = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},{variants[index % 4]}:s={WIDTH}x{HEIGHT}:fps={FPS},format=yuv420p"
+        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},{variants[index % 4]}:s={width}x{height}:fps={FPS},format=yuv420p"
         run(["ffmpeg", "-y", "-loop", "1", "-t", str(duration), "-i", str(src), "-vf", vf, "-an", str(dest)])
     else:
-        vf = f"{face_crop_filter(src)},fps={FPS},format=yuv420p"
-        run(["ffmpeg", "-y", "-stream_loop", "-1", "-t", str(duration), "-i", str(src), "-vf", vf, "-an", str(dest)])
+        vf = f"{face_crop_filter(src, width, height)},fps={FPS},format=yuv420p"
+        if keep_audio:
+            # Preserve original audio — no duration cap, let clip run naturally
+            run(["ffmpeg", "-y", "-i", str(src), "-vf", vf,
+                 "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", str(dest)])
+        else:
+            run(["ffmpeg", "-y", "-stream_loop", "-1", "-t", str(duration), "-i", str(src),
+                 "-vf", vf, "-an", str(dest)])
+
+
+def concat_clips_with_audio(clips: list[Path], out_path: Path) -> None:
+    """Concatenate clips preserving their original audio streams."""
+    if len(clips) == 1:
+        shutil.copyfile(clips[0], out_path)
+        return
+    concat_file = out_path.with_name("concat_list.txt")
+    concat_file.write_text("\n".join(f"file '{c}'" for c in clips), encoding="utf-8")
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
+         "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", str(out_path)])
 
 
 def concat_clips(clips: list[Path], durations: list[float], tone: str, script: str, out_path: Path) -> None:
@@ -255,6 +283,42 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
     if not urls:
         raise RuntimeError("No media assets provided for rendering")
 
+    width, height = get_dimensions(payload.format)
+    keep_audio = payload.use_original_audio or False
+
+    # Download source files
+    source_paths: list[Path] = []
+    for i, url in enumerate(urls):
+        ext = Path(str(url).split("?")[0]).suffix or ".mp4"
+        path = workdir / f"source_{i}{ext}"
+        download(str(url), path)
+        source_paths.append(path)
+
+    if keep_audio:
+        # ── Original audio path ─────────────────────────────────
+        # Render clips preserving audio, use natural durations
+        rendered_clips: list[Path] = []
+        for i, src in enumerate(source_paths):
+            out = workdir / f"clip_{i}.mp4"
+            render_clip(src, out, 0, i, width, height, keep_audio=True)
+            rendered_clips.append(out)
+
+        video_with_audio = workdir / "video_only.mp4"
+        concat_clips_with_audio(rendered_clips, video_with_audio)
+
+        # Estimate duration from file sizes / fallback
+        total_duration = float(payload.duration_seconds or 30)
+        captions = workdir / "captions.ass"
+        make_ass(payload.script_text or "", total_duration, captions)
+
+        final = workdir / "final.mp4"
+        ass_path = css_escape_ass_path(captions)
+        run(["ffmpeg", "-y", "-i", str(video_with_audio),
+             "-vf", f"ass='{ass_path}'",
+             "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", str(final)])
+        return final
+
+    # ── AI voiceover path ────────────────────────────────────────
     voice_path = workdir / "voiceover.mp3"
     if payload.voiceover_url:
         download(payload.voiceover_url, voice_path)
@@ -264,21 +328,14 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
     durations = script_timings(payload.script_text or "", len(urls), total_duration)
     durations = snap_to_pauses(durations, pauses, total_duration)
 
-    source_paths: list[Path] = []
-    for i, url in enumerate(urls):
-        ext = Path(str(url).split("?")[0]).suffix or ".mp4"
-        path = workdir / f"source_{i}{ext}"
-        download(str(url), path)
-        source_paths.append(path)
-
-    rendered_clips: list[Path] = []
+    rendered_clips2: list[Path] = []
     for i, src in enumerate(source_paths):
         out = workdir / f"clip_{i}.mp4"
-        render_clip(src, out, durations[i], i)
-        rendered_clips.append(out)
+        render_clip(src, out, durations[i], i, width, height, keep_audio=False)
+        rendered_clips2.append(out)
 
     video_only = workdir / "video_only.mp4"
-    concat_clips(rendered_clips, durations, payload.tone or "trustworthy", payload.script_text or "", video_only)
+    concat_clips(rendered_clips2, durations, payload.tone or "trustworthy", payload.script_text or "", video_only)
 
     captions = workdir / "captions.ass"
     make_ass(payload.script_text or "", total_duration, captions)
@@ -297,7 +354,8 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
             "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)
         ])
     elif voice_path.exists():
-        run(["ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path), "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)])
+        run(["ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path),
+             "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)])
     elif music:
         run([
             "ffmpeg", "-y", "-i", str(captioned), "-i", str(music),

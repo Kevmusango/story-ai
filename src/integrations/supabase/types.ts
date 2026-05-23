@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -14,88 +14,100 @@ export type Database = {
   }
   public: {
     Tables: {
-      businesses: {
+      credits: {
         Row: {
-          city: string | null
-          created_at: string | null
-          goal: string | null
+          balance: number
           id: string
-          location: string | null
-          logo_url: string | null
-          name: string | null
-          neighbourhood: string | null
-          type: string
+          updated_at: string
           user_id: string
-          website_url: string | null
         }
         Insert: {
-          city?: string | null
-          created_at?: string | null
-          goal?: string | null
+          balance?: number
           id?: string
-          location?: string | null
-          logo_url?: string | null
-          name?: string | null
-          neighbourhood?: string | null
-          type: string
+          updated_at?: string
           user_id: string
-          website_url?: string | null
         }
         Update: {
-          city?: string | null
-          created_at?: string | null
-          goal?: string | null
+          balance?: number
           id?: string
-          location?: string | null
-          logo_url?: string | null
-          name?: string | null
-          neighbourhood?: string | null
-          type?: string
+          updated_at?: string
           user_id?: string
-          website_url?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "businesses_user_id_fkey"
+            foreignKeyName: "credits_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
       }
-      chat_sessions: {
+      generations: {
         Row: {
-          business_id: string | null
-          created_at: string | null
+          angle_downloaded: boolean
+          angles: Json | null
+          created_at: string
+          cta: string | null
+          error_message: string | null
+          hook: string | null
           id: string
-          messages: Json | null
+          media_analysis: Json | null
+          project_id: string
+          script: string | null
+          selected_angle_id: string | null
+          status: string
+          updated_at: string
           user_id: string
+          voice_style: string
+          voiceover_url: string | null
         }
         Insert: {
-          business_id?: string | null
-          created_at?: string | null
+          angle_downloaded?: boolean
+          angles?: Json | null
+          created_at?: string
+          cta?: string | null
+          error_message?: string | null
+          hook?: string | null
           id?: string
-          messages?: Json | null
+          media_analysis?: Json | null
+          project_id: string
+          script?: string | null
+          selected_angle_id?: string | null
+          status?: string
+          updated_at?: string
           user_id: string
+          voice_style?: string
+          voiceover_url?: string | null
         }
         Update: {
-          business_id?: string | null
-          created_at?: string | null
+          angle_downloaded?: boolean
+          angles?: Json | null
+          created_at?: string
+          cta?: string | null
+          error_message?: string | null
+          hook?: string | null
           id?: string
-          messages?: Json | null
+          media_analysis?: Json | null
+          project_id?: string
+          script?: string | null
+          selected_angle_id?: string | null
+          status?: string
+          updated_at?: string
           user_id?: string
+          voice_style?: string
+          voiceover_url?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "chat_sessions_business_id_fkey"
-            columns: ["business_id"]
+            foreignKeyName: "generations_project_id_fkey"
+            columns: ["project_id"]
             isOneToOne: false
-            referencedRelation: "businesses"
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "chat_sessions_user_id_fkey"
+            foreignKeyName: "generations_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -106,144 +118,184 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
-          created_at: string | null
+          created_at: string
           full_name: string | null
           id: string
-          plan: Database["public"]["Enums"]["subscription_plan"] | null
-          updated_at: string | null
-          video_credits: number | null
+          plan: string
+          updated_at: string
         }
         Insert: {
           avatar_url?: string | null
-          created_at?: string | null
+          created_at?: string
           full_name?: string | null
           id: string
-          plan?: Database["public"]["Enums"]["subscription_plan"] | null
-          updated_at?: string | null
-          video_credits?: number | null
+          plan?: string
+          updated_at?: string
         }
         Update: {
           avatar_url?: string | null
-          created_at?: string | null
+          created_at?: string
           full_name?: string | null
           id?: string
-          plan?: Database["public"]["Enums"]["subscription_plan"] | null
-          updated_at?: string | null
-          video_credits?: number | null
+          plan?: string
+          updated_at?: string
         }
         Relationships: []
       }
-      variation_memory: {
+      projects: {
         Row: {
-          business_id: string
+          business_type: string | null
+          content_goal: string | null
+          created_at: string
+          emotional_angle: string | null
           id: string
-          last_3_archetypes: Json | null
-          last_3_openers: Json | null
-          last_3_scripts: Json | null
-          last_3_tones: Json | null
-          updated_at: string | null
+          industry_bucket: string | null
+          persona: string | null
+          status: string
+          title: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          business_id: string
+          business_type?: string | null
+          content_goal?: string | null
+          created_at?: string
+          emotional_angle?: string | null
           id?: string
-          last_3_archetypes?: Json | null
-          last_3_openers?: Json | null
-          last_3_scripts?: Json | null
-          last_3_tones?: Json | null
-          updated_at?: string | null
+          industry_bucket?: string | null
+          persona?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          business_id?: string
+          business_type?: string | null
+          content_goal?: string | null
+          created_at?: string
+          emotional_angle?: string | null
           id?: string
-          last_3_archetypes?: Json | null
-          last_3_openers?: Json | null
-          last_3_scripts?: Json | null
-          last_3_tones?: Json | null
-          updated_at?: string | null
+          industry_bucket?: string | null
+          persona?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "variation_memory_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: true
-            referencedRelation: "businesses"
+            foreignKeyName: "projects_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uploads: {
+        Row: {
+          created_at: string
+          file_type: string
+          file_url: string
+          id: string
+          mime_type: string | null
+          project_id: string
+          sort_order: number
+          user_id: string
+          vision_labels: Json | null
+        }
+        Insert: {
+          created_at?: string
+          file_type: string
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          project_id: string
+          sort_order?: number
+          user_id: string
+          vision_labels?: Json | null
+        }
+        Update: {
+          created_at?: string
+          file_type?: string
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          project_id?: string
+          sort_order?: number
+          user_id?: string
+          vision_labels?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uploads_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "uploads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
       }
       videos: {
         Row: {
-          archetype_used: string | null
-          asset_urls: Json | null
-          business_id: string | null
-          created_at: string | null
+          created_at: string
           duration_seconds: number | null
-          final_video_url: string | null
+          generation_id: string | null
           id: string
-          mode: Database["public"]["Enums"]["video_mode"]
-          opening_line: string | null
-          output_url: string | null
-          platform: Database["public"]["Enums"]["platform_format"] | null
+          project_id: string | null
           render_error: string | null
           render_status: string
           rendered_at: string | null
-          script_text: string | null
-          status: Database["public"]["Enums"]["video_status"] | null
-          stock_urls: Json | null
           thumbnail_url: string | null
-          tone_used: string | null
           user_id: string
+          video_url: string | null
         }
         Insert: {
-          archetype_used?: string | null
-          asset_urls?: Json | null
-          business_id?: string | null
-          created_at?: string | null
+          created_at?: string
           duration_seconds?: number | null
-          final_video_url?: string | null
+          generation_id?: string | null
           id?: string
-          mode: Database["public"]["Enums"]["video_mode"]
-          opening_line?: string | null
-          output_url?: string | null
-          platform?: Database["public"]["Enums"]["platform_format"] | null
+          project_id?: string | null
           render_error?: string | null
           render_status?: string
           rendered_at?: string | null
-          script_text?: string | null
-          status?: Database["public"]["Enums"]["video_status"] | null
-          stock_urls?: Json | null
           thumbnail_url?: string | null
-          tone_used?: string | null
           user_id: string
+          video_url?: string | null
         }
         Update: {
-          archetype_used?: string | null
-          asset_urls?: Json | null
-          business_id?: string | null
-          created_at?: string | null
+          created_at?: string
           duration_seconds?: number | null
-          final_video_url?: string | null
+          generation_id?: string | null
           id?: string
-          mode?: Database["public"]["Enums"]["video_mode"]
-          opening_line?: string | null
-          output_url?: string | null
-          platform?: Database["public"]["Enums"]["platform_format"] | null
+          project_id?: string | null
           render_error?: string | null
           render_status?: string
           rendered_at?: string | null
-          script_text?: string | null
-          status?: Database["public"]["Enums"]["video_status"] | null
-          stock_urls?: Json | null
           thumbnail_url?: string | null
-          tone_used?: string | null
           user_id?: string
+          video_url?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "videos_business_id_fkey"
-            columns: ["business_id"]
+            foreignKeyName: "videos_generation_id_fkey"
+            columns: ["generation_id"]
             isOneToOne: false
-            referencedRelation: "businesses"
+            referencedRelation: "generations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "videos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -263,17 +315,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      platform_format:
-        | "tiktok"
-        | "instagram_reels"
-        | "youtube_shorts"
-        | "facebook_reels"
-        | "instagram_square"
-        | "youtube"
-        | "facebook"
-      subscription_plan: "free" | "starter" | "growth" | "agency"
-      video_mode: "quick" | "advanced" | "upload"
-      video_status: "pending" | "generating" | "complete" | "failed"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -400,19 +442,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      platform_format: [
-        "tiktok",
-        "instagram_reels",
-        "youtube_shorts",
-        "facebook_reels",
-        "instagram_square",
-        "youtube",
-        "facebook",
-      ],
-      subscription_plan: ["free", "starter", "growth", "agency"],
-      video_mode: ["quick", "advanced", "upload"],
-      video_status: ["pending", "generating", "complete", "failed"],
-    },
+    Enums: {},
   },
 } as const

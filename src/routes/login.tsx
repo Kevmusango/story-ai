@@ -9,8 +9,8 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
   head: () => ({
     meta: [
-      { title: "Log in — StoryLens AI" },
-      { name: "description", content: "Sign in to your StoryLens AI account." },
+      { title: "Log in — AdEngine AI" },
+      { name: "description", content: "Sign in to your AdEngine AI account." },
     ],
   }),
 });
@@ -118,7 +118,7 @@ export function AuthShell({ mode, children }: { mode: "login" | "signup"; childr
             <Play className="w-4 h-4 text-black fill-black" />
           </span>
           <span className="font-serif font-bold text-white text-base">
-            StoryLens<span className="text-[#c8ff00]"> AI</span>
+            AdEngine<span className="text-[#c8ff00]"> AI</span>
           </span>
         </Link>
         <Link
@@ -146,7 +146,7 @@ export function AuthShell({ mode, children }: { mode: "login" | "signup"; childr
           </div>
           <h1 className="font-serif font-bold text-3xl sm:text-4xl leading-tight mb-2">
             {mode === "login" ? (
-              <>Sign in to <span className="italic text-[#c8ff00]">StoryLens</span></>
+              <>Sign in to <span className="italic text-[#c8ff00]">AdEngine</span></>
             ) : (
               <>Create your <span className="italic text-[#c8ff00]">account</span></>
             )}
@@ -154,7 +154,7 @@ export function AuthShell({ mode, children }: { mode: "login" | "signup"; childr
           <p className="text-white/40 text-sm mb-8">
             {mode === "login"
               ? "Pick up where you left off."
-              : "Start turning your business into stories people actually watch."}
+              : "Start turning your business content into targeted marketing videos."}
           </p>
           {children}
         </motion.div>

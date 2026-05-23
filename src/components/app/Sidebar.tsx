@@ -1,9 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard,
-  Zap,
-  MessageSquare,
-  Upload,
+  Wand2,
   Film,
   Settings,
   LogOut,
@@ -18,9 +16,7 @@ import { toast } from "sonner";
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard", exact: true },
-  { icon: Zap, label: "Quick Mode", to: "/dashboard/quick", exact: false },
-  { icon: MessageSquare, label: "Advanced Mode", to: "/dashboard/advanced", exact: false },
-  { icon: Upload, label: "Upload Mode", to: "/dashboard/upload", exact: false },
+  { icon: Wand2, label: "Create", to: "/dashboard/create", exact: false },
   { icon: Film, label: "My Videos", to: "/dashboard/videos", exact: false },
 ];
 
@@ -54,7 +50,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileClose
               <Play className="w-3.5 h-3.5 text-black fill-black" />
             </span>
             <span className="font-serif font-bold text-white text-[15px] leading-none">
-              Story<span className="text-[#c8ff00]">line</span>
+              AdEngine<span className="text-[#c8ff00]"> AI</span>
             </span>
           </Link>
         )}
@@ -196,3 +192,4 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileClose
     </>
   );
 }
+
