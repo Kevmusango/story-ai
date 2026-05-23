@@ -256,23 +256,15 @@ def concat_clips(clips: list[Path], durations: list[float], tone: str, script: s
         shutil.copyfile(clips[0], out_path)
         return
 
-    inputs = []
+    inputs: list[str] = []
     for clip in clips:
         inputs.extend(["-i", str(clip)])
 
-    filters = []
-    current = "[0:v]"
-    offset = durations[0]
-    clip_count = len(clips)
-    for i in range(1, clip_count):
-        transition = 0.05 if sentence_is_punchy(script, i - 1, clip_count) or tone in {"energetic", "funny"} else 0.5
-        offset = max(0.1, offset - transition)
-        out_label = f"[v{i}]"
-        filters.append(f"{current}[{i}:v]xfade=transition=fade:duration={transition}:offset={offset}{out_label}")
-        current = out_label
-        offset += durations[i]
-
-    run(["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(filters), "-map", current, "-an", "-pix_fmt", "yuv420p", str(out_path)])
+    n = len(clips)
+    filter_inputs = "".join(f"[{i}:v]" for i in range(n))
+    run(["ffmpeg", "-y", *inputs,
+         "-filter_complex", f"{filter_inputs}concat=n={n}:v=1:a=0[v]",
+         "-map", "[v]", "-an", "-pix_fmt", "yuv420p", str(out_path)])
 
 
 TONE_QUERIES: dict[str, str] = {
