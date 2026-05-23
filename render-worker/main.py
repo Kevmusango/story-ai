@@ -51,6 +51,8 @@ class RenderPayload(BaseModel):
 
 
 def run(cmd: list[str]) -> None:
+    if cmd and cmd[0] == "ffmpeg":
+        cmd = ["ffmpeg", "-threads", "1"] + cmd[1:]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr[-4000:] or "FFmpeg command failed")
@@ -459,7 +461,7 @@ def render_job(payload: RenderPayload) -> None:
             print(f"[render-worker] failed video={payload.video_id}: {exc}")
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health() -> dict[str, str]:
     return {"ok": "true"}
 
