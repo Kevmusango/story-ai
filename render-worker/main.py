@@ -48,6 +48,7 @@ class RenderPayload(BaseModel):
     bucket: Optional[str] = "media"
     format: Optional[str] = "portrait"         # portrait | landscape | square
     use_original_audio: Optional[bool] = False  # keep source video audio
+    caption_style: Optional[str] = "tiktok"     # tiktok | business | luxury
 
 
 def run(cmd: list[str]) -> None:
@@ -163,36 +164,79 @@ def sentence_is_punchy(script: str, index: int, clip_count: int) -> bool:
     return len(sentences[sentence_idx].split()) <= 7
 
 
-def make_ass(script: str, total_duration: float, out_path: Path) -> None:
-    words = [w for w in script.split() if w]
-    if not words:
-        words = [script.strip() or "..."]
+def extract_hook(script: str) -> str:
+    sentences = split_sentences(script)
+    first = sentences[0] if sentences else script.strip()
+    return " ".join(first.split()[:8])
 
-    CHUNK = 2
-    chunks: list[list[str]] = [words[i:i + CHUNK] for i in range(0, len(words), CHUNK)]
-    chunk_dur = total_duration / max(len(chunks), 1)
 
-    def ts(s: float) -> str:
-        h = int(s // 3600)
-        m = int((s % 3600) // 60)
-        sec = s % 60
-        return f"{h}:{m:02d}:{sec:05.2f}"
+def _ass_ts(s: float) -> str:
+    h = int(s // 3600)
+    m = int((s % 3600) // 60)
+    sec = s % 60
+    return f"{h}:{m:02d}:{sec:05.2f}"
 
-    BRAND  = "&H0000FFC8&"   # #c8ff00 brand accent (ASS AABBGGRR)
-    WHITE  = "&H00FFFFFF&"
-    SHADOW = "&H99000000&"
 
-    header = (
-        "[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\n\n"
-        "[V4+ Styles]\n"
-        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
-        "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
-        "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Default,Arial,68,{WHITE},{WHITE},&H00000000,{SHADOW},-1,0,0,0,100,100,1,0,1,4,2,2,60,60,180,1\n\n"
-        "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+def _hook_event(hook: str, total_dur: float) -> str:
+    """Big hook text pop-in at top of frame for first 3 seconds."""
+    if not hook or total_dur < 4.5:
+        return ""
+    words = hook.upper().split()
+    lines: list[str] = []
+    cur: list[str] = []
+    for w in words:
+        cur.append(w)
+        if len(" ".join(cur)) > 14 and len(cur) > 1:
+            lines.append(" ".join(cur[:-1]))
+            cur = [w]
+    if cur:
+        lines.append(" ".join(cur))
+    wrapped = "\\N".join(lines[:3])
+    return (
+        f"Dialogue: 1,{_ass_ts(0)},{_ass_ts(3.0)},Hook,,0,0,0,,"
+        f"{{\\an8\\fscx65\\fscy65\\alpha&HFF&"
+        f"\\t(0,350,\\fscx100\\fscy100\\alpha&H00&)"
+        f"\\t(2600,3000,\\alpha&HFF&)}}"
+        f"{wrapped}\n"
     )
 
-    lines = [header]
+
+_ASS_INFO   = "[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\n\n"
+_ASS_SFMT   = (
+    "[V4+ Styles]\n"
+    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
+    "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+    "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+)
+_ASS_HOOK_S = "Style: Hook,Liberation Sans,110,&H00FFFFFF,&H00FFFFFF,&H00000000,&H99000000,-1,0,0,0,100,100,3,0,1,6,3,8,60,60,120,1\n"
+_ASS_EVENTS = "\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+
+
+def make_ass(script: str, total_duration: float, out_path: Path, style: str = "tiktok") -> None:
+    hook = extract_hook(script)
+    if style == "business":
+        _make_ass_business(script, total_duration, out_path, hook)
+    elif style == "luxury":
+        _make_ass_luxury(script, total_duration, out_path, hook)
+    else:
+        _make_ass_tiktok(script, total_duration, out_path, hook)
+
+
+def _make_ass_tiktok(script: str, total_duration: float, out_path: Path, hook: str = "") -> None:
+    """Word-by-word: current word brand-yellow bold, others dimmed."""
+    words = [w for w in script.split() if w] or [script.strip() or "..."]
+    BRAND  = "&H0000FFC8&"
+    WHITE  = "&H00FFFFFF&"
+    SHADOW = "&H99000000&"
+    CHUNK  = 2
+    chunks: list[list[str]] = [words[i:i + CHUNK] for i in range(0, len(words), CHUNK)]
+    chunk_dur = total_duration / max(len(chunks), 1)
+    header = (
+        _ASS_INFO + _ASS_SFMT
+        + f"Style: Default,Liberation Sans,68,{WHITE},{WHITE},&H00000000,{SHADOW},-1,0,0,0,100,100,1,0,1,4,2,2,60,60,180,1\n"
+        + _ASS_HOOK_S + _ASS_EVENTS
+    )
+    lines = [header, _hook_event(hook, total_duration)]
     for i, chunk in enumerate(chunks):
         chunk_start = i * chunk_dur
         word_dur = chunk_dur / max(len(chunk), 1)
@@ -206,9 +250,51 @@ def make_ass(script: str, total_duration: float, out_path: Path) -> None:
                     parts.append(f"{{\\c{BRAND}\\b1\\fscx110\\fscy110}}{clean}{{\\r}}")
                 else:
                     parts.append(f"{{\\alpha&H60&}}{clean}{{\\r}}")
-            text = " ".join(parts)
-            lines.append(f"Dialogue: 0,{ts(w_start)},{ts(w_end)},Default,,0,0,0,,{text}\n")
+            lines.append(f"Dialogue: 0,{_ass_ts(w_start)},{_ass_ts(w_end)},Default,,0,0,0,,{' '.join(parts)}\n")
+    out_path.write_text("".join(lines), encoding="utf-8")
 
+
+def _make_ass_business(script: str, total_duration: float, out_path: Path, hook: str = "") -> None:
+    """Sentence-by-sentence, clean white text, subtle fade-in."""
+    sentences = split_sentences(script) or [script.strip() or "..."]
+    sent_dur  = total_duration / max(len(sentences), 1)
+    header = (
+        _ASS_INFO + _ASS_SFMT
+        + "Style: Default,Liberation Sans,52,&H00FFFFFF,&H00FFFFFF,&H00000000,&H88000000,0,0,0,0,100,100,1,0,1,3,2,2,80,80,150,1\n"
+        + _ASS_HOOK_S + _ASS_EVENTS
+    )
+    lines = [header, _hook_event(hook, total_duration)]
+    for i, sent in enumerate(sentences):
+        start = i * sent_dur
+        end   = min(total_duration, start + sent_dur)
+        clean = sent.replace("{", "").replace("}", "")
+        lines.append(
+            f"Dialogue: 0,{_ass_ts(start)},{_ass_ts(end)},Default,,0,0,0,,"
+            f"{{\\alpha&HFF&\\t(0,200,\\alpha&H00&)}}{clean}\n"
+        )
+    out_path.write_text("".join(lines), encoding="utf-8")
+
+
+def _make_ass_luxury(script: str, total_duration: float, out_path: Path, hook: str = "") -> None:
+    """One word at a time, uppercase, center-screen, elegant fade in/out."""
+    words = [w for w in script.split() if w] or [script.strip() or "..."]
+    word_dur = total_duration / max(len(words), 1)
+    fade_ms  = max(100, min(200, int(word_dur * 1000 * 0.25)))
+    header = (
+        _ASS_INFO + _ASS_SFMT
+        + "Style: Default,Liberation Sans,60,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,8,0,1,2,1,5,80,80,200,1\n"
+        + _ASS_HOOK_S + _ASS_EVENTS
+    )
+    lines = [header, _hook_event(hook, total_duration)]
+    for i, word in enumerate(words):
+        start  = i * word_dur
+        end    = start + word_dur
+        clean  = word.replace("{", "").replace("}", "").upper()
+        out_ms = int(word_dur * 1000)
+        lines.append(
+            f"Dialogue: 0,{_ass_ts(start)},{_ass_ts(end)},Default,,0,0,0,,"
+            f"{{\\alpha&HFF&\\t(0,{fade_ms},\\alpha&H00&)\\t({out_ms - fade_ms},{out_ms},\\alpha&HFF&)}}{clean}\n"
+        )
     out_path.write_text("".join(lines), encoding="utf-8")
 
 
@@ -395,7 +481,7 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
         # Estimate duration from file sizes / fallback
         total_duration = float(payload.duration_seconds or 30)
         captions = workdir / "captions.ass"
-        make_ass(payload.script_text or "", total_duration, captions)
+        make_ass(payload.script_text or "", total_duration, captions, payload.caption_style or "tiktok")
 
         final = workdir / "final.mp4"
         ass_path = css_escape_ass_path(captions)
@@ -432,7 +518,7 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
 
     print("[render] burning captions")
     captions = workdir / "captions.ass"
-    make_ass(payload.script_text or "", total_duration, captions)
+    make_ass(payload.script_text or "", total_duration, captions, payload.caption_style or "tiktok")
 
     captioned = workdir / "captioned.mp4"
     ass_path = css_escape_ass_path(captions)
@@ -451,11 +537,23 @@ def assemble(payload: RenderPayload, workdir: Path) -> Path:
     has_voice = voice_path.exists()
     print(f"[render] mixing audio voice={has_voice} music={bool(music)}")
     if has_voice and music:
-        run([
-            "ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path), "-i", str(music),
-            "-filter_complex", "[1:a]volume=1.0[a1];[2:a]volume=0.25[a2];[a1][a2]amix=inputs=2:duration=first[a]",
-            "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)
-        ])
+        try:
+            run([
+                "ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path), "-i", str(music),
+                "-filter_complex",
+                "[2:a]volume=0.6,aformat=fltp:44100:stereo[music];"
+                "[1:a]aformat=fltp:44100:stereo[voice];"
+                "[music][voice]sidechaincompress=threshold=0.02:ratio=8:attack=100:release=500[ducked];"
+                "[voice][ducked]amix=inputs=2:duration=first[a]",
+                "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)
+            ])
+        except RuntimeError:
+            print("[render] sidechaincompress unavailable, falling back to simple mix")
+            run([
+                "ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path), "-i", str(music),
+                "-filter_complex", "[1:a]volume=1.0[a1];[2:a]volume=0.25[a2];[a1][a2]amix=inputs=2:duration=first[a]",
+                "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)
+            ])
     elif has_voice:
         run(["ffmpeg", "-y", "-i", str(captioned), "-i", str(voice_path),
              "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-shortest", str(final)])

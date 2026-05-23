@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libglib2.0-0 \
     libgl1 \
+    fonts-liberation \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

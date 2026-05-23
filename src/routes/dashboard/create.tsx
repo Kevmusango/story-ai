@@ -398,6 +398,7 @@ function AnglesStep({
   angles, mediaAnalysis,
   selectedAngleId, onSelect,
   voiceStyle, onVoiceStyle,
+  captionStyle, onCaptionStyle,
   onBack, onGenerate, loading, error,
 }: {
   angles: AngleOutput[];
@@ -406,6 +407,8 @@ function AnglesStep({
   onSelect: (id: string) => void;
   voiceStyle: VoiceStyleId;
   onVoiceStyle: (v: VoiceStyleId) => void;
+  captionStyle: "tiktok" | "business" | "luxury";
+  onCaptionStyle: (v: "tiktok" | "business" | "luxury") => void;
   onBack: () => void;
   onGenerate: () => void;
   loading: boolean;
@@ -482,6 +485,32 @@ function AnglesStep({
         </div>
       </div>
 
+      {/* Caption style */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-white/50 uppercase tracking-widest">Caption Style</label>
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { id: "tiktok"   as const, icon: "🎵", label: "TikTok Bold",    sub: "Word highlight" },
+            { id: "business" as const, icon: "💼", label: "Business Pro",   sub: "Clean sentences" },
+            { id: "luxury"   as const, icon: "✨", label: "Luxury Minimal", sub: "Elegant fade" },
+          ]).map((opt) => (
+            <button
+              key={opt.id}
+              onClick={() => onCaptionStyle(opt.id)}
+              className={`p-3 rounded-xl border text-left transition-all ${
+                captionStyle === opt.id
+                  ? "border-[#c8ff00] bg-[#c8ff00]/[0.06]"
+                  : "border-white/[0.06] bg-[#0e0e12] hover:border-white/15"
+              }`}
+            >
+              <div className="text-base mb-1">{opt.icon}</div>
+              <p className="text-xs font-semibold text-white mb-0.5">{opt.label}</p>
+              <p className="text-[10px] text-white/35">{opt.sub}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {error && (
         <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400">
           <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -523,6 +552,7 @@ function CreatePage() {
   const [contentGoal, setContentGoal] = useState<ContentGoalId | null>(null);
   const [personaId, setPersonaId] = useState<PersonaId | null>(null);
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyleId>("warm");
+  const [captionStyle, setCaptionStyle] = useState<"tiktok" | "business" | "luxury">("tiktok");
   const [videoFormat, setVideoFormat] = useState<"portrait" | "landscape" | "square">("portrait");
   const [useOriginalAudio, setUseOriginalAudio] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(30);
@@ -613,7 +643,7 @@ function CreatePage() {
     setStep("generating");
     try {
       await generateVideo({
-        data: { generationId, selectedAngleId, voiceStyle, videoFormat, useOriginalAudio, durationSeconds },
+        data: { generationId, selectedAngleId, voiceStyle, videoFormat, useOriginalAudio, durationSeconds, captionStyle },
       });
       navigate({ to: "/dashboard/videos" });
     } catch (err) {
@@ -679,6 +709,8 @@ function CreatePage() {
             onSelect={setSelectedAngleId}
             voiceStyle={voiceStyle}
             onVoiceStyle={setVoiceStyle}
+            captionStyle={captionStyle}
+            onCaptionStyle={setCaptionStyle}
             onBack={() => setStep("configure")}
             onGenerate={handleGenerate}
             loading={generating}

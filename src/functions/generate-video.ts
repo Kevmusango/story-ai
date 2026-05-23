@@ -14,9 +14,10 @@ export const generateVideo = createServerFn()
       videoFormat: z.enum(["portrait", "landscape", "square"]).default("portrait"),
       useOriginalAudio: z.boolean().default(false),
       durationSeconds: z.number().int().min(10).max(60).default(30),
+      captionStyle: z.enum(["tiktok", "business", "luxury"]).default("tiktok"),
     })
   )
-  .handler(async ({ data: { generationId, selectedAngleId, voiceStyle, videoFormat, useOriginalAudio, durationSeconds } }) => {
+  .handler(async ({ data: { generationId, selectedAngleId, voiceStyle, videoFormat, useOriginalAudio, durationSeconds, captionStyle } }) => {
     const supabase = createClient<Database>(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -112,6 +113,7 @@ export const generateVideo = createServerFn()
           format: videoFormat,
           use_original_audio: useOriginalAudio,
           duration_seconds: durationSeconds,
+          caption_style: captionStyle,
         }),
       }).catch(() => {
         // Fire-and-forget — render-worker handles its own status updates
