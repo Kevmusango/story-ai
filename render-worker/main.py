@@ -261,9 +261,10 @@ def concat_clips(clips: list[Path], durations: list[float], tone: str, script: s
         inputs.extend(["-i", str(clip)])
 
     n = len(clips)
-    filter_inputs = "".join(f"[{i}:v]" for i in range(n))
+    sar_filters = "".join(f"[{i}:v]setsar=1[s{i}];" for i in range(n))
+    concat_inputs = "".join(f"[s{i}]" for i in range(n))
     run(["ffmpeg", "-y", *inputs,
-         "-filter_complex", f"{filter_inputs}concat=n={n}:v=1:a=0[v]",
+         "-filter_complex", f"{sar_filters}{concat_inputs}concat=n={n}:v=1:a=0[v]",
          "-map", "[v]", "-an", "-pix_fmt", "yuv420p", str(out_path)])
 
 
