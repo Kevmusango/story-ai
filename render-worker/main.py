@@ -25,14 +25,14 @@ FPS = 30
 BUCKET = "media"
 
 FORMATS = {
-    "portrait":  (1080, 1920),
-    "landscape": (1920, 1080),
-    "square":    (1080, 1080),
+    "portrait":  (720, 1280),
+    "landscape": (1280, 720),
+    "square":    (720, 720),
 }
 
 
 def get_dimensions(fmt: str) -> tuple[int, int]:
-    return FORMATS.get(fmt or "portrait", (1080, 1920))
+    return FORMATS.get(fmt or "portrait", (720, 1280))
 
 app = FastAPI(title="Story AI Render Worker")
 
@@ -234,7 +234,7 @@ def render_clip(src: Path, dest: Path, duration: float, index: int,
         if keep_audio:
             # Preserve original audio — no duration cap, let clip run naturally
             run(["ffmpeg", "-y", "-i", str(src), "-vf", vf,
-                 "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", str(dest)])
+                 "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-pix_fmt", "yuv420p", str(dest)])
         else:
             run(["ffmpeg", "-y", "-stream_loop", "-1", "-t", str(duration), "-i", str(src),
                  "-vf", vf, "-an", str(dest)])
@@ -248,7 +248,7 @@ def concat_clips_with_audio(clips: list[Path], out_path: Path) -> None:
     concat_file = out_path.with_name("concat_list.txt")
     concat_file.write_text("\n".join(f"file '{c}'" for c in clips), encoding="utf-8")
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
-         "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", str(out_path)])
+         "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-pix_fmt", "yuv420p", str(out_path)])
 
 
 def concat_clips(clips: list[Path], durations: list[float], tone: str, script: str, out_path: Path) -> None:
