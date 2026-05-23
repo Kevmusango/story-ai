@@ -71,10 +71,11 @@ function VideoCard({ video, onRetry, onDelete }: { video: VideoRow; onRetry: () 
 
   const [retrying, setRetrying] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm("Delete this video? This cannot be undone.")) return;
     setDeleting(true);
+    setConfirmDelete(false);
     try {
       await supabase.from("videos").delete().eq("id", video.id);
       toast.success("Video deleted");
@@ -111,7 +112,7 @@ function VideoCard({ video, onRetry, onDelete }: { video: VideoRow; onRetry: () 
   };
 
   return (
-    <div className="bg-[#0e0e12] border border-white/[0.07] rounded-2xl overflow-hidden hover:border-white/15 transition-all">
+    <div className="relative bg-[#0e0e12] border border-white/[0.07] rounded-2xl overflow-hidden hover:border-white/15 transition-all">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
         <div className="flex items-center gap-2">
@@ -132,12 +133,12 @@ function VideoCard({ video, onRetry, onDelete }: { video: VideoRow; onRetry: () 
           </span>
           <span className="text-[10px] text-white/25">{timeAgo(video.created_at)}</span>
           <button
-            onClick={handleDelete}
+            onClick={() => setConfirmDelete(true)}
             disabled={deleting}
             className="p-1 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-40"
             title="Delete video"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className={`w-3.5 h-3.5 ${deleting ? "animate-pulse" : ""}`} />
           </button>
         </div>
       </div>
@@ -216,6 +217,35 @@ function VideoCard({ video, onRetry, onDelete }: { video: VideoRow; onRetry: () 
           >
             <Download className="w-3.5 h-3.5" /> Download MP4
           </button>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#13131a] border border-white/10 rounded-2xl p-5 w-full max-w-xs space-y-4">
+            <div className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-red-400 flex-shrink-0" />
+              <p className="text-sm font-semibold text-white">Delete video?</p>
+            </div>
+            <p className="text-xs text-white/40 leading-relaxed">
+              This will permanently delete the video record. This cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2 rounded-xl border border-white/10 text-xs text-white/50 hover:text-white hover:border-white/20 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 py-2 rounded-xl bg-red-500/20 border border-red-500/30 text-xs text-red-400 hover:bg-red-500/30 font-semibold transition"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
