@@ -312,11 +312,18 @@ def pick_music(tone: str) -> str:
 def make_background_music(duration: float, out_path: Path, music_url: str) -> Optional[Path]:
     if not music_url:
         return None
-    raw = out_path.with_suffix(".music")
-    download(music_url, raw)
-    looped = out_path.with_name("music_looped.mp3")
-    run(["ffmpeg", "-y", "-stream_loop", "-1", "-t", str(duration), "-i", str(raw), "-vn", "-acodec", "libmp3lame", str(looped)])
-    return looped
+    try:
+        raw = out_path.with_suffix(".music")
+        download(music_url, raw)
+        if raw.stat().st_size < 1024:
+            print("[music] downloaded file too small, skipping")
+            return None
+        looped = out_path.with_name("music_looped.mp3")
+        run(["ffmpeg", "-y", "-stream_loop", "-1", "-t", str(duration), "-i", str(raw), "-vn", "-acodec", "libmp3lame", str(looped)])
+        return looped
+    except Exception as e:
+        print(f"[music] failed to prepare music, skipping: {e}")
+        return None
 
 
 def assemble(payload: RenderPayload, workdir: Path) -> Path:
